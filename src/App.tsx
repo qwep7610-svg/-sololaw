@@ -65,7 +65,7 @@ export default function App() {
     featureVisibility?: Record<string, boolean>;
   }>({
     appName: 'SoloLaw',
-    appSubtext: 'SoloLaw 도우미',
+    appSubtext: 'SoloLaw Assistant',
     logoUrl: null,
     heroTitle: '어렵고 복잡한 법률 절차,\n이제 SoloLaw AI가 해결해 드립니다.',
     heroDescription: '변호사 없이도 완벽하게. 일상어로 설명하면 전문가 수준의 법률 문서를 즉시 생성합니다.\n지금 바로 등록하고 당신만의 스마트한 법률 도우미를 만나보세요.',
@@ -100,7 +100,7 @@ export default function App() {
         const data = docSnap.data();
         setBranding({
           appName: data.appName || 'SoloLaw',
-          appSubtext: data.appSubtext || 'SoloLaw 도우미',
+          appSubtext: data.appSubtext || 'SoloLaw Assistant',
           logoUrl: data.logoUrl || null,
           heroTitle: data.heroTitle || '어렵고 복잡한 법률 절차,\n이제 SoloLaw AI가 해결해 드립니다.',
           heroDescription: data.heroDescription || '변호사 없이도 완벽하게. 일상어로 설명하면 전문가 수준의 법률 문서를 즉시 생성합니다.\n지금 바로 등록하고 당신만의 스마트한 법률 도우미를 만나보세요.',

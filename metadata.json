@@ -1,5 +1,5 @@
 {
-  "name": "나홀로소송 도우미 (SoloLaw)",
+  "name": "SoloLaw",
   "description": "일상어로 작성한 사연을 법적 소장으로 변환하고, 복잡한 판결문을 알기 쉽게 요약해주는 인공지능 법률 비서입니다.",
   "requestFramePermissions": [
     "camera"

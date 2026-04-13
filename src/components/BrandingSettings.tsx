@@ -40,7 +40,7 @@ interface BrandingConfig {
 export const BrandingSettings: React.FC = () => {
   const [config, setConfig] = useState<BrandingConfig>({
     appName: 'SoloLaw',
-    appSubtext: 'SoloLaw 도우미',
+    appSubtext: 'SoloLaw Assistant',
     logoUrl: null,
     primaryColor: '#2563EB',
     heroTitle: '어렵고 복잡한 법률 절차,\n이제 SoloLaw AI가 해결해 드립니다.',
