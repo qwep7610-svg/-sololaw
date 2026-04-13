@@ -136,6 +136,7 @@ export const BrandingSettings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -163,7 +164,7 @@ export const BrandingSettings: React.FC = () => {
     if (!file) return;
 
     if (file.size > 800000) {
-      alert('로고 크기가 너무 큽니다. 800KB 이하의 사진을 선택해 주세요.');
+      setErrorMsg('로고 크기가 너무 큽니다. 800KB 이하의 사진을 선택해 주세요.');
       return;
     }
 
@@ -192,7 +193,7 @@ export const BrandingSettings: React.FC = () => {
       if (error instanceof Error && error.message.includes('permission')) {
         handleFirestoreError(error, OperationType.WRITE, 'app_settings/branding');
       } else {
-        alert('저장 중 오류가 발생했습니다.');
+        setErrorMsg('저장 중 오류가 발생했습니다.');
       }
     } finally {
       setIsSaving(false);
@@ -210,6 +211,25 @@ export const BrandingSettings: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-4">

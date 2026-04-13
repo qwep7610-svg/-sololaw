@@ -66,6 +66,7 @@ export default function LawyerReviewService({ onBack }: { onBack: () => void }) 
   const [lawyerNotes, setLawyerNotes] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [lawyerStatus, setLawyerStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Load landing copy
   useEffect(() => {
@@ -164,7 +165,7 @@ export default function LawyerReviewService({ onBack }: { onBack: () => void }) 
     if (!user || user.role !== 'lawyer') return;
     
     if (lawyerStatus !== 'approved') {
-      alert('변호사 자격 승인 완료 후 이용 가능합니다. 관리자 대시보드에서 승인 상태를 확인해 주세요.');
+      setErrorMsg('변호사 자격 승인 완료 후 이용 가능합니다. 관리자 대시보드에서 승인 상태를 확인해 주세요.');
       return;
     }
 
@@ -182,7 +183,7 @@ export default function LawyerReviewService({ onBack }: { onBack: () => void }) 
 
   const handleStartReview = async (requestId: string) => {
     if (lawyerStatus !== 'approved') {
-      alert('변호사 자격 승인 완료 후 이용 가능합니다.');
+      setErrorMsg('변호사 자격 승인 완료 후 이용 가능합니다.');
       return;
     }
     try {
@@ -223,6 +224,25 @@ export default function LawyerReviewService({ onBack }: { onBack: () => void }) 
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <button 
           onClick={() => {
@@ -516,7 +536,7 @@ export default function LawyerReviewService({ onBack }: { onBack: () => void }) 
                         본 검토 결과는 담당 변호사 개인이 작성한 것이며, <strong>나홀로소송 도우미 (SoloLaw)</strong>는 검토 내용에 개입하거나 그 결과에 책임을 지지 않습니다. 검토 의견에 대한 상세 문의는 담당 변호사 사무실로 직접 연락하시기 바랍니다.
                       </p>
                       <button 
-                        onClick={() => alert('변호사 사무실 연결 기능은 준비 중입니다.')}
+                        onClick={() => setErrorMsg('변호사 사무실 연결 기능은 준비 중입니다.')}
                         className="w-full py-3 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" /> 담당 변호사와 유료 전화 상담하기

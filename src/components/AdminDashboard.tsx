@@ -159,6 +159,7 @@ export default function AdminDashboard() {
   const [verificationStep, setVerificationStep] = useState<{ lawyerId: string, step: 1 | 2 | 3 } | null>(null);
   const [rejectionModal, setRejectionModal] = useState<{ show: boolean, lawyer: any } | null>(null);
   const [customRejectionReason, setCustomRejectionReason] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [branding, setBranding] = useState<any>(null);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
@@ -350,10 +351,10 @@ export default function AdminDashboard() {
         read: false
       });
 
-      alert("변호사 승인이 완료되었습니다. 증빙 서류는 보안을 위해 즉시 파기되었습니다.");
+      setErrorMsg("변호사 승인이 완료되었습니다. 증빙 서류는 보안을 위해 즉시 파기되었습니다.");
     } catch (error) {
       console.error("Approval failed:", error);
-      alert("승인 처리 중 오류가 발생했습니다.");
+      setErrorMsg("승인 처리 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -379,10 +380,10 @@ export default function AdminDashboard() {
         read: false
       });
 
-      alert("반려 처리가 완료되었습니다.");
+      setErrorMsg("반려 처리가 완료되었습니다.");
     } catch (error) {
       console.error("Rejection failed:", error);
-      alert("반려 처리 중 오류가 발생했습니다.");
+      setErrorMsg("반려 처리 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -394,10 +395,10 @@ export default function AdminDashboard() {
     try {
       await deleteDoc(doc(db, 'lawyers', lawyer.id));
       await logAdminAction('DELETE_LAWYER', lawyer.id, 'Admin deleted lawyer registration');
-      alert("변호사 등록 정보가 삭제되었습니다.");
+      setErrorMsg("변호사 등록 정보가 삭제되었습니다.");
     } catch (error) {
       console.error("Delete failed:", error);
-      alert("삭제 중 오류가 발생했습니다.");
+      setErrorMsg("삭제 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -422,7 +423,7 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error("Verification failed:", error);
-      alert(error instanceof Error ? error.message : '검증 중 오류가 발생했습니다.');
+      setErrorMsg(error instanceof Error ? error.message : '검증 중 오류가 발생했습니다.');
     } finally {
       setVerifyingId(null);
     }
@@ -435,7 +436,7 @@ export default function AdminDashboard() {
       setSecurityGuideline(guideline);
     } catch (error) {
       console.error("Failed to generate security guideline:", error);
-      alert(error instanceof Error ? error.message : '보안 프로토콜 생성 중 오류가 발생했습니다.');
+      setErrorMsg(error instanceof Error ? error.message : '보안 프로토콜 생성 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -451,7 +452,7 @@ export default function AdminDashboard() {
       setAdAnalysis(analysis);
     } catch (error) {
       console.error("Failed to analyze ads:", error);
-      alert(error instanceof Error ? error.message : '광고 분석 중 오류가 발생했습니다.');
+      setErrorMsg(error instanceof Error ? error.message : '광고 분석 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -488,7 +489,7 @@ export default function AdminDashboard() {
       });
 
       await batch.commit();
-      alert('정산이 완료되었습니다.');
+      setErrorMsg('정산이 완료되었습니다.');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'settlements');
     } finally {
@@ -507,7 +508,7 @@ export default function AdminDashboard() {
         platformFee: stats.platformFee,
         finalSettlement: stats.netAmount
       });
-      alert(report);
+      setErrorMsg(report);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
@@ -524,7 +525,7 @@ export default function AdminDashboard() {
         status: 'inactive',
         updatedAt: serverTimestamp()
       });
-      alert('구독이 취소되었습니다.');
+      setErrorMsg('구독이 취소되었습니다.');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `subscriptions/${subId}`);
     } finally {
@@ -553,6 +554,25 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-bold text-[#0F172A] font-serif flex items-center gap-2">
@@ -796,7 +816,7 @@ export default function AdminDashboard() {
                               <button 
                                 onClick={() => handleAuditAction('SAMPLE_REPORT', req.id, (reason) => {
                                   logAdminAction('SAMPLE_REPORT', req.userId, reason);
-                                  alert("품질 검수를 위한 리포트 열람 권한이 부여되었습니다.");
+                                  setErrorMsg("품질 검수를 위한 리포트 열람 권한이 부여되었습니다.");
                                 })}
                                 className="p-2 hover:bg-brand-50 rounded-lg text-brand-600 transition-colors"
                                 title="리포트 샘플링 검수"
@@ -1476,7 +1496,7 @@ export default function AdminDashboard() {
                     <button 
                       onClick={() => {
                         if (!reasonInput.trim()) {
-                          alert("승인 사유를 입력해 주세요.");
+                          setErrorMsg("승인 사유를 입력해 주세요.");
                           return;
                         }
                         handleApproveLawyer(allLawyers.find(l => l.id === verificationStep.lawyerId), reasonInput);

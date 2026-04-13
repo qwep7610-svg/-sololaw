@@ -45,6 +45,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
     article3: false
   });
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev => 
@@ -106,7 +107,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
       } else if (error.message) {
         message = `로그인 실패: ${error.message}`;
       }
-      alert(message);
+      setErrorMsg(message);
       setIsLoggingIn(false);
     }
   };
@@ -134,7 +135,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
         return;
       }
     } catch (error: any) {
-      alert(error.message);
+      setErrorMsg(error.message);
       setIsLoggingIn(false);
     }
   };
@@ -148,7 +149,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
         return;
       }
     } catch (error: any) {
-      alert(error.message);
+      setErrorMsg(error.message);
       setIsLoggingIn(false);
     }
   };
@@ -183,7 +184,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
       onComplete(type);
     } catch (error) {
       console.error("Error completing registration:", error);
-      alert("가입 완료 처리 중 오류가 발생했습니다.");
+      setErrorMsg("가입 완료 처리 중 오류가 발생했습니다.");
     } finally {
       setIsLoggingIn(false);
     }
@@ -191,6 +192,29 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl"
+          >
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">오류 발생</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       <AnimatePresence mode="wait">
         {step === 'type' && (
           <motion.div
@@ -366,7 +390,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
                     if (userDoc.exists() && userDoc.data().twoFactorSecret === pin) {
                       nextStep();
                     } else {
-                      alert('PIN 번호가 일치하지 않습니다.');
+                      setErrorMsg('PIN 번호가 일치하지 않습니다.');
                       setPin('');
                     }
                   } catch (error) {
@@ -386,7 +410,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
             <button 
               onClick={() => {
                 // In a real app, we might offer recovery options
-                alert('보안 PIN을 잊으셨나요? 관리자에게 문의해 주세요.');
+                setErrorMsg('보안 PIN을 잊으셨나요? 관리자에게 문의해 주세요.');
               }}
               className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
             >

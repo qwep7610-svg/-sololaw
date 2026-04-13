@@ -62,6 +62,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
   const [isGeneratingAd, setIsGeneratingAd] = useState(false);
   const [isCheckingCompliance, setIsCheckingCompliance] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -136,7 +137,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
 
     // Check file size (limit to ~1MB for Firestore)
     if (file.size > 800000) {
-      alert('사진 크기가 너무 큽니다. 800KB 이하의 사진을 선택해 주세요.');
+      setErrorMsg('사진 크기가 너무 큽니다. 800KB 이하의 사진을 선택해 주세요.');
       return;
     }
 
@@ -152,7 +153,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
     if (!file) return;
 
     if (file.size > 800000) {
-      alert('로고 크기가 너무 큽니다. 800KB 이하의 사진을 선택해 주세요.');
+      setErrorMsg('로고 크기가 너무 큽니다. 800KB 이하의 사진을 선택해 주세요.');
       return;
     }
 
@@ -168,7 +169,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
     if (!file) return;
 
     if (file.size > 800000) {
-      alert('서류 크기가 너무 큽니다. 800KB 이하의 파일을 선택해 주세요.');
+      setErrorMsg('서류 크기가 너무 큽니다. 800KB 이하의 파일을 선택해 주세요.');
       return;
     }
 
@@ -185,7 +186,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
 
   const handleRequestBillingKey = (plan: 'basic' | 'standard' | 'premium', amount: number) => {
     if (!window.IMP) {
-      alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
+      setErrorMsg('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
       return;
     }
     
@@ -216,7 +217,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
           });
           
           if (response.ok) {
-            alert('정기 결제 등록이 완료되었습니다.');
+            setErrorMsg('정기 결제 등록이 완료되었습니다.');
             // Reload subscription
             const subRef = doc(db, 'subscriptions', user!.uid);
             const subSnap = await getDoc(subRef);
@@ -225,31 +226,31 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
             }
           } else {
             const errData = await response.json();
-            alert(`서버 저장 중 오류가 발생했습니다: ${errData.error || 'Unknown error'}`);
+            setErrorMsg(`서버 저장 중 오류가 발생했습니다: ${errData.error || 'Unknown error'}`);
           }
         } catch (error) {
           console.error('Subscription error:', error);
-          alert('통신 중 오류가 발생했습니다.');
+          setErrorMsg('통신 중 오류가 발생했습니다.');
         } finally {
           setIsSubscribing(false);
         }
       } else {
-        alert(`등록 실패: ${rsp.error_msg}`);
+        setErrorMsg(`등록 실패: ${rsp.error_msg}`);
       }
     });
   };
 
   const handleSave = async () => {
     if (!user) {
-      alert('로그인이 필요합니다.');
+      setErrorMsg('로그인이 필요합니다.');
       return;
     }
     if (!user.email) {
-      alert('이메일 정보가 확인되지 않습니다. 다시 로그인해 주세요.');
+      setErrorMsg('이메일 정보가 확인되지 않습니다. 다시 로그인해 주세요.');
       return;
     }
     if (!profile.name || !profile.experience || !profile.regNumber || !profile.location) {
-      alert('이름, 경력 사항, 등록번호, 소속 정보는 필수 입력 항목입니다.');
+      setErrorMsg('이름, 경력 사항, 등록번호, 소속 정보는 필수 입력 항목입니다.');
       return;
     }
 
@@ -262,7 +263,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
       
       // If no existing verification doc, require one
       if (!existingReg?.verificationDocUrl && !verificationFile) {
-        alert('자격 증빙 서류를 업로드해 주세요.');
+        setErrorMsg('자격 증빙 서류를 업로드해 주세요.');
         setIsSaving(false);
         return;
       }
@@ -320,9 +321,9 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
     } catch (error: any) {
       console.error("Error saving lawyer profile:", error);
       if (error.message?.includes('permission')) {
-        alert('권한이 없습니다. 관리자에게 문의하거나 다시 로그인해 주세요.');
+        setErrorMsg('권한이 없습니다. 관리자에게 문의하거나 다시 로그인해 주세요.');
       } else {
-        alert('프로필 저장 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
+        setErrorMsg('프로필 저장 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
       }
     } finally {
       setIsSaving(false);
@@ -388,7 +389,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
 
   const handleGenerateAd = async () => {
     if (!profile.name || !profile.specialty || !profile.experience) {
-      alert('이름, 전문 분야, 경력 사항을 먼저 입력해 주세요.');
+      setErrorMsg('이름, 전문 분야, 경력 사항을 먼저 입력해 주세요.');
       return;
     }
     setIsGeneratingAd(true);
@@ -425,6 +426,25 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between px-2">
         <button 
           onClick={onBack}

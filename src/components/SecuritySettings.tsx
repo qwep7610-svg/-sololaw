@@ -12,6 +12,7 @@ export default function SecuritySettings({ onBack }: { onBack: () => void }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -53,11 +54,11 @@ export default function SecuritySettings({ onBack }: { onBack: () => void }) {
 
   const handleSetupPin = async () => {
     if (pin.length !== 6 || !/^\d+$/.test(pin)) {
-      alert('6자리 숫자를 입력해 주세요.');
+      setErrorMsg('6자리 숫자를 입력해 주세요.');
       return;
     }
     if (pin !== confirmPin) {
-      alert('비밀번호가 일치하지 않습니다.');
+      setErrorMsg('비밀번호가 일치하지 않습니다.');
       return;
     }
 
@@ -107,11 +108,11 @@ export default function SecuritySettings({ onBack }: { onBack: () => void }) {
       historySnap.forEach(d => batch.delete(d.ref));
 
       await batch.commit();
-      alert('모든 데이터가 성공적으로 삭제되었습니다.');
+      setErrorMsg('모든 데이터가 성공적으로 삭제되었습니다.');
       onBack();
     } catch (error) {
       console.error("Error deleting all data:", error);
-      alert('데이터 삭제 중 오류가 발생했습니다.');
+      setErrorMsg('데이터 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsSaving(false);
     }
@@ -127,6 +128,25 @@ export default function SecuritySettings({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <button 
         onClick={onBack}
         className="flex items-center gap-2 text-sm font-medium text-[#64748B] hover:text-[#0F172A] transition-colors"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { User, Search, Mail } from 'lucide-react';
 
 export default function UserManagement() {
@@ -18,7 +18,7 @@ export default function UserManagement() {
       }));
       setUsers(userList);
     }, (error) => {
-      console.error("Error fetching users:", error);
+      handleFirestoreError(error, OperationType.LIST, 'users');
     });
 
     return () => unsubscribe();

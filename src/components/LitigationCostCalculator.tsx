@@ -42,6 +42,7 @@ export default function LitigationCostCalculator({ onBack, initialData }: { onBa
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -67,7 +68,7 @@ export default function LitigationCostCalculator({ onBack, initialData }: { onBa
       setResult(analysis);
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : '계산 중 오류가 발생했습니다.');
+      setErrorMsg(error instanceof Error ? error.message : '계산 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -95,12 +96,31 @@ export default function LitigationCostCalculator({ onBack, initialData }: { onBa
       setTimeout(() => setIsSaved(false), 2000);
     } catch (error) {
       console.error("Failed to save to history:", error);
-      alert("저장 중 오류가 발생했습니다.");
+      setErrorMsg("저장 중 오류가 발생했습니다.");
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <button 
           onClick={onBack}

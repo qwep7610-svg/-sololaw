@@ -20,6 +20,7 @@ export default function ComplaintHistory({ onBack, onCalculateCost }: { onBack: 
   const [editContent, setEditContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -69,7 +70,7 @@ export default function ComplaintHistory({ onBack, onCalculateCost }: { onBack: 
       setTimeout(() => setShowSaveSuccess(false), 2000);
     } catch (error) {
       console.error("Failed to save changes:", error);
-      alert("저장 중 오류가 발생했습니다.");
+      setErrorMsg("저장 중 오류가 발생했습니다.");
     } finally {
       setIsSaving(false);
     }
@@ -83,7 +84,7 @@ export default function ComplaintHistory({ onBack, onCalculateCost }: { onBack: 
       setDeleteId(null);
     } catch (error) {
       console.error("Failed to delete history:", error);
-      alert("삭제 중 오류가 발생했습니다.");
+      setErrorMsg("삭제 중 오류가 발생했습니다.");
     }
   };
 
@@ -108,6 +109,25 @@ export default function ComplaintHistory({ onBack, onCalculateCost }: { onBack: 
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <button 
           onClick={() => {

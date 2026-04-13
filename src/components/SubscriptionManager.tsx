@@ -48,6 +48,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
 
   useEffect(() => {
@@ -105,7 +106,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
     const impId = (import.meta as any).env.VITE_PORTONE_IMP_ID;
     if (!impId) {
       console.error("PortOne Merchant ID (VITE_PORTONE_IMP_ID) is missing.");
-      alert("등록된 PG 설정 정보가 없습니다. 관리자에게 문의하여 VITE_PORTONE_IMP_ID 환경 변수를 설정해 주세요.");
+      setErrorMsg("등록된 PG 설정 정보가 없습니다. 관리자에게 문의하여 VITE_PORTONE_IMP_ID 환경 변수를 설정해 주세요.");
       return;
     }
 
@@ -153,10 +154,10 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
       }));
       
       setShowUpgradeModal(false);
-      alert(`${plan.name} 플랜으로 성공적으로 업그레이드되었습니다!`);
+      setErrorMsg(`${plan.name} 플랜으로 성공적으로 업그레이드되었습니다!`);
     } catch (error) {
       console.error("Upgrade failed:", error);
-      alert("업그레이드 처리 중 오류가 발생했습니다.");
+      setErrorMsg("업그레이드 처리 중 오류가 발생했습니다.");
     } finally {
       setIsProcessing(false);
     }
@@ -178,7 +179,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
         cancelAtPeriodEnd: true
       }));
       
-      alert("구독 취소가 예약되었습니다. 현재 이용 기간 종료 후에는 베이직(무료) 상태로 전환됩니다.");
+      setErrorMsg("구독 취소가 예약되었습니다. 현재 이용 기간 종료 후에는 베이직(무료) 상태로 전환됩니다.");
     } catch (error) {
       console.error("Cancel failed:", error);
     } finally {
@@ -200,6 +201,25 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-10">
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <p className="text-sm text-slate-600">{errorMsg}</p>
+              <button 
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1.5">
