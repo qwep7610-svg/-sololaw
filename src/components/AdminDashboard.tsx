@@ -50,8 +50,9 @@ import { verifyLawyerCredentials, generateSecurityGuideline, manageAdInventory, 
 import { useAuth } from '../lib/AuthContext';
 import PolicyEditor from './PolicyEditor';
 import BrandingSettings from './BrandingSettings';
+import UserManagement from './UserManagement';
 
-type AdminTab = 'verification' | 'monitoring' | 'revenue' | 'security' | 'stats' | 'policies' | 'branding' | 'payments';
+type AdminTab = 'verification' | 'monitoring' | 'revenue' | 'security' | 'stats' | 'policies' | 'branding' | 'payments' | 'subscriptions' | 'users';
 
 const AdminFeatureManager = ({ branding }: { branding: any }) => {
   
@@ -564,11 +565,13 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-[#E2E8F0] shadow-sm overflow-x-auto scrollbar-hide">
           {[
             { id: 'verification', label: '변호사 승인', icon: ShieldCheck },
+            { id: 'users', label: '회원 관리', icon: Users },
             { id: 'monitoring', label: '검토 모니터링', icon: Activity },
+            { id: 'subscriptions', label: '구독 관리', icon: CreditCard },
             { id: 'revenue', label: '정산/광고', icon: CreditCard },
             { id: 'security', label: '보안/로그', icon: Lock },
             { id: 'stats', label: '통계 리포트', icon: BarChart3 },
-            { id: 'payments', label: '결제 관리', icon: Wallet },
+            { id: 'payments', label: '결제 내역', icon: Wallet },
             { id: 'policies', label: '정책 관리', icon: FileText },
             { id: 'branding', label: '브랜딩 설정', icon: Palette },
           ].map((tab) => (
@@ -589,6 +592,18 @@ export default function AdminDashboard() {
       </div>
 
       <AnimatePresence mode="wait">
+        {activeTab === 'users' && (
+          <motion.div
+            key="users"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            <UserManagement />
+          </motion.div>
+        )}
+
         {activeTab === 'verification' && (
           <motion.div
             key="verification"
@@ -1107,15 +1122,14 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
-        {activeTab === 'payments' && (
+        {activeTab === 'subscriptions' && (
           <motion.div
-            key="payments"
+            key="subscriptions"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="space-y-8"
           >
-            {/* Subscription Management Section */}
             <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
               <div className="p-6 border-b border-[#F1F5F9] flex items-center justify-between">
                 <h3 className="font-bold text-lg flex items-center gap-2">
@@ -1176,7 +1190,7 @@ export default function AdminDashboard() {
                     ))}
                     {subscriptions.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-12 text-center text-slate-400">
+                        <td colSpan={6} className="p-12 text-center text-slate-400">
                           구독 내역이 없습니다.
                         </td>
                       </tr>
@@ -1185,7 +1199,17 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+          </motion.div>
+        )}
 
+        {activeTab === 'payments' && (
+          <motion.div
+            key="payments"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
             {/* Payment History Section */}
             <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
               <div className="p-6 border-b border-[#F1F5F9]">

@@ -98,7 +98,15 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
       }
     } catch (error: any) {
       console.error("Google login error:", error);
-      alert("로그인 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      let message = "로그인 중 오류가 발생했습니다. 다시 시도해 주세요.";
+      if (error.code === 'auth/unauthorized-domain') {
+        message = "현재 도메인이 Firebase 콘솔의 '승인된 도메인'에 등록되지 않았습니다. 관리자 설정이 필요합니다.";
+      } else if (error.code === 'auth/popup-blocked') {
+        message = "팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.";
+      } else if (error.message) {
+        message = `로그인 실패: ${error.message}`;
+      }
+      alert(message);
       setIsLoggingIn(false);
     }
   };
