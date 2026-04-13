@@ -22,7 +22,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     title: "소송의 시작",
     term: "소장 (Complaint)",
     definition: "내가 왜 소송을 하는지, 무엇을 원하는지 적어서 법원에 내는 첫 번째 서류입니다.",
-    tip: "솔로로 AI가 여러분의 사연을 법률 용어로 가득 찬 멋진 소장으로 바꿔드립니다.",
+    tip: "SoloLaw AI가 여러분의 사연을 법률 용어로 가득 찬 멋진 소장으로 바꿔드립니다.",
     icon: <BookOpen className="w-12 h-12 text-indigo-600" />
   },
   {
@@ -36,7 +36,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     title: "법원의 피드백",
     term: "보정명령 (Correction Order)",
     definition: "법원이 제출된 서류를 보고 '이 부분은 부족하니 고쳐오세요'라고 내리는 지시입니다.",
-    tip: "당황하지 마세요! 보정명령서를 솔로로에 업로드하면 어떻게 고쳐야 할지 바로 알려드립니다.",
+    tip: "당황하지 마세요! 보정명령서를 SoloLaw에 업로드하면 어떻게 고쳐야 할지 바로 알려드립니다.",
     icon: <Sparkles className="w-12 h-12 text-amber-600" />
   }
 ];

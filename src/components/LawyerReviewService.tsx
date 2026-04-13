@@ -513,7 +513,7 @@ export default function LawyerReviewService({ onBack }: { onBack: () => void }) 
                     
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
                       <p className="text-[10px] text-slate-400 leading-relaxed">
-                        본 검토 결과는 담당 변호사 개인이 작성한 것이며, <strong>나홀로소송 도우미 솔로로(SoloLaw)</strong>는 검토 내용에 개입하거나 그 결과에 책임을 지지 않습니다. 검토 의견에 대한 상세 문의는 담당 변호사 사무실로 직접 연락하시기 바랍니다.
+                        본 검토 결과는 담당 변호사 개인이 작성한 것이며, <strong>나홀로소송 도우미 (SoloLaw)</strong>는 검토 내용에 개입하거나 그 결과에 책임을 지지 않습니다. 검토 의견에 대한 상세 문의는 담당 변호사 사무실로 직접 연락하시기 바랍니다.
                       </p>
                       <button 
                         onClick={() => alert('변호사 사무실 연결 기능은 준비 중입니다.')}

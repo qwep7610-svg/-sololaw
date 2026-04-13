@@ -197,7 +197,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
       pg: 'html5_inicis.billing',
       pay_method: 'card',
       merchant_uid: `billing_${user?.uid}_${Date.now()}`,
-      name: `솔로로 변호사 정액제 광고 (${plan.toUpperCase()})`,
+      name: `SoloLaw 변호사 정액제 광고 (${plan.toUpperCase()})`,
       amount: 0, // Billing key issuance is 0 won
       customer_uid: `lawyer_${user?.uid}`, // Unique ID for this lawyer's card
     }, async (rsp: any) => {
@@ -449,7 +449,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
               <h3 className="text-lg font-bold">[변호사 자격 승인 대기 안내]</h3>
             </div>
             <div className="space-y-3 text-sm text-brand-800/80 leading-relaxed">
-              <p><strong>솔로로(SoloLaw)</strong>를 선택해 주셔서 감사합니다.</p>
+              <p><strong>SoloLaw</strong>를 선택해 주셔서 감사합니다.</p>
               <p>전문가 회원의 신뢰도를 위해 현재 관리자가 대한변호사협회 등록 정보를 바탕으로 자격 검토를 진행 중입니다.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div className="bg-white/50 p-4 rounded-2xl">
@@ -576,7 +576,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
                 type="text"
                 value={profile.firmName}
                 onChange={(e) => setProfile(prev => ({ ...prev, firmName: e.target.value }))}
-                placeholder="예: 법무법인 솔로로"
+                placeholder="예: 법무법인 SoloLaw"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all text-sm"
               />
             </div>
@@ -756,7 +756,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#0F172A]">솔로로 파트너십 구독</h3>
+              <h3 className="text-lg font-bold text-[#0F172A]">SoloLaw 파트너십 구독</h3>
               <p className="text-xs text-slate-500">정액제 광고로 더 많은 의뢰인을 만나보세요.</p>
             </div>
           </div>
@@ -958,12 +958,12 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
             <div className="p-2 bg-brand-800 rounded-xl">
               <ShieldCheck className="w-5 h-5 text-brand-400" />
             </div>
-            <h3 className="text-lg font-bold">솔로로 파트너십 안내 (정액제 광고 상품)</h3>
+            <h3 className="text-lg font-bold">SoloLaw 파트너십 안내 (정액제 광고 상품)</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <h4 className="text-sm font-bold text-brand-300">"솔로로는 사건 수임에 관여하지 않습니다."</h4>
+              <h4 className="text-sm font-bold text-brand-300">"SoloLaw는 사건 수임에 관여하지 않습니다."</h4>
               <p className="text-xs text-brand-100/80 leading-relaxed">
                 본 플랫폼은 변호사법을 준수하며, 의뢰인과의 상담이나 수임 과정에서 어떠한 수수료도 취하지 않습니다. 
                 변호사님께서는 오직 <strong>'플랫폼 내 노출 공간'</strong>에 대한 정액 광고비만 지불하시면 됩니다.

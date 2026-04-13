@@ -109,7 +109,7 @@ async function startServer() {
             customer_uid: sub.billingKey,
             merchant_uid: `sub_${sub.lawyerId}_${Date.now()}`,
             amount: sub.amount,
-            name: `솔로로 변호사 정액제 광고 (${sub.planType})`
+            name: `SoloLaw 변호사 정액제 광고 (${sub.planType})`
           }, {
             headers: { Authorization: accessToken }
           });

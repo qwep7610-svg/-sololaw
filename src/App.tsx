@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, lazy, Suspense, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Scale, FileText, MessageSquare, Info, ChevronRight, Gavel, History, ShieldAlert, ListOrdered, TrendingUp, Building2, Mail, LogIn, LogOut, User as UserIcon, Loader2, Calculator, Heart, Menu, X, ShieldCheck, Camera, UserPlus, Briefcase, Clock, XCircle, MapPin, Sparkles, CreditCard, Activity } from 'lucide-react';
 import LitigationManager from './components/LitigationManager';
@@ -63,9 +63,9 @@ export default function App() {
     values?: any[];
   }>({
     appName: 'SoloLaw',
-    appSubtext: '솔로로 도우미',
+    appSubtext: 'SoloLaw 도우미',
     logoUrl: null,
-    heroTitle: '어렵고 복잡한 법률 절차,\n이제 솔로로 AI가 해결해 드립니다.',
+    heroTitle: '어렵고 복잡한 법률 절차,\n이제 SoloLaw AI가 해결해 드립니다.',
     heroDescription: '변호사 없이도 완벽하게. 일상어로 설명하면 전문가 수준의 법률 문서를 즉시 생성합니다.\n지금 바로 등록하고 당신만의 스마트한 법률 도우미를 만나보세요.',
     heroTitleSize: 60,
     heroTitleFont: 'serif',
@@ -97,9 +97,9 @@ export default function App() {
         const data = docSnap.data();
         setBranding({
           appName: data.appName || 'SoloLaw',
-          appSubtext: data.appSubtext || '솔로로 도우미',
+          appSubtext: data.appSubtext || 'SoloLaw 도우미',
           logoUrl: data.logoUrl || null,
-          heroTitle: data.heroTitle || '어렵고 복잡한 법률 절차,\n이제 솔로로 AI가 해결해 드립니다.',
+          heroTitle: data.heroTitle || '어렵고 복잡한 법률 절차,\n이제 SoloLaw AI가 해결해 드립니다.',
           heroDescription: data.heroDescription || '변호사 없이도 완벽하게. 일상어로 설명하면 전문가 수준의 법률 문서를 즉시 생성합니다.\n지금 바로 등록하고 당신만의 스마트한 법률 도우미를 만나보세요.',
           heroTitleSize: data.heroTitleSize || 60,
           heroTitleFont: data.heroTitleFont || 'serif',
@@ -220,11 +220,11 @@ export default function App() {
                 className={`font-black text-[#0F172A] leading-[1.15] tracking-tight whitespace-pre-line ${memoizedBranding.heroTitleFont === 'sans' ? 'font-sans' : 'font-serif'}`}
                 style={{ fontSize: `${memoizedBranding.heroTitleSize || 60}px` }}
               >
-                {memoizedBranding.heroTitle?.split('솔로로 AI').map((part, i, arr) => (
+                {memoizedBranding.heroTitle?.split('SoloLaw AI').map((part, i, arr) => (
                   <span key={i}>
                     {part}
                     {i < arr.length - 1 && (
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600">솔로로 AI</span>
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600">SoloLaw AI</span>
                     )}
                   </span>
                 ))}
@@ -506,7 +506,7 @@ export default function App() {
               <FeatureCard 
                 icon={<Info className="w-8 h-8 text-indigo-600" />}
                 title="회사 소개"
-                description="솔로로 AI를 만드는 사람들과 우리의 비전을 소개합니다."
+                description="SoloLaw AI를 만드는 사람들과 우리의 비전을 소개합니다."
                 onClick={() => navigateTo('about')}
                 color="bg-indigo-50"
               />
@@ -516,18 +516,156 @@ export default function App() {
       );
     }
 
-    if (view === 'complaint') return <ProtectedRoute onNavigate={navigateTo}><ComplaintWizard onBack={() => navigateTo('home')} initialData={complaintInitialData} /></ProtectedRoute>;
-    if (view === 'history') return <ProtectedRoute onNavigate={navigateTo}><ComplaintHistory onBack={() => navigateTo('home')} onCalculateCost={handleCalculateCostFromHistory} /></ProtectedRoute>;
-    if (view === 'lawyer_reg') return <ProtectedRoute onNavigate={navigateTo}><LawyerRegistration onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    if (view === 'complaint') {
+      if (!memoizedUser) {
+        return (
+          <motion.div
+            key="auth-redirect"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-12"
+          >
+            <AuthWizard 
+              onComplete={(type) => {
+                if (type === 'lawyer') navigateTo('lawyer_reg');
+                // Stay on complaint view after login
+              }}
+              onBack={() => navigateTo('home')}
+              initialType="user"
+            />
+          </motion.div>
+        );
+      }
+      return <ProtectedRoute onNavigate={navigateTo}><ComplaintWizard onBack={() => navigateTo('home')} initialData={complaintInitialData} /></ProtectedRoute>;
+    }
+    if (view === 'history') {
+      if (!memoizedUser) {
+        return (
+          <motion.div
+            key="auth-redirect-history"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-12"
+          >
+            <AuthWizard 
+              onComplete={() => {}}
+              onBack={() => navigateTo('home')}
+              initialType="user"
+            />
+          </motion.div>
+        );
+      }
+      return <ProtectedRoute onNavigate={navigateTo}><ComplaintHistory onBack={() => navigateTo('home')} onCalculateCost={handleCalculateCostFromHistory} /></ProtectedRoute>;
+    }
+    if (view === 'lawyer_reg') {
+      if (!memoizedUser) {
+        return (
+          <motion.div
+            key="auth-redirect-lawyer-reg"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-12"
+          >
+            <AuthWizard 
+              onComplete={() => navigateTo('lawyer_reg')}
+              onBack={() => navigateTo('home')}
+              initialType="lawyer"
+            />
+          </motion.div>
+        );
+      }
+      return <ProtectedRoute onNavigate={navigateTo}><LawyerRegistration onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    }
     if (view === 'lawyer_search') return <LawyerSearch onBack={() => navigateTo('home')} />;
     if (view === 'lawyer_review') return <ProtectedRoute onNavigate={navigateTo}><LawyerReviewService onBack={() => navigateTo('home')} /></ProtectedRoute>;
     if (view === 'subscription') return <ProtectedRoute requiredRole="lawyer" onNavigate={navigateTo}><SubscriptionManager onBack={() => navigateTo('home')} /></ProtectedRoute>;
     if (view === 'cost') return <LitigationCostCalculator onBack={() => navigateTo('home')} />;
-    if (view === 'summarizer') return <ProtectedRoute onNavigate={navigateTo}><DocumentSummarizer onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    if (view === 'summarizer') {
+      if (!memoizedUser) {
+        return (
+          <motion.div
+            key="auth-redirect-summarizer"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-12"
+          >
+            <AuthWizard 
+              onComplete={(type) => {
+                if (type === 'lawyer') navigateTo('lawyer_reg');
+              }}
+              onBack={() => navigateTo('home')}
+              initialType="user"
+            />
+          </motion.div>
+        );
+      }
+      return <ProtectedRoute onNavigate={navigateTo}><DocumentSummarizer onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    }
     if (view === 'litigation_finder') return <LitigationTypeFinder onBack={() => navigateTo('home')} onStartComplaint={(situation) => { setComplaintInitialData({ summary: situation }); navigateTo('complaint'); }} />;
-    if (view === 'demand_letter') return <ProtectedRoute onNavigate={navigateTo}><DemandLetterWizard onBack={() => navigateTo('home')} /></ProtectedRoute>;
-    if (view === 'admin_appeal') return <ProtectedRoute onNavigate={navigateTo}><AdminAppealWizard onBack={() => navigateTo('home')} /></ProtectedRoute>;
-    if (view === 'divorce') return <ProtectedRoute onNavigate={navigateTo}><DivorceWizard onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    if (view === 'demand_letter') {
+      if (!memoizedUser) {
+        return (
+          <motion.div
+            key="auth-redirect-demand"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-12"
+          >
+            <AuthWizard 
+              onComplete={() => {}}
+              onBack={() => navigateTo('home')}
+              initialType="user"
+            />
+          </motion.div>
+        );
+      }
+      return <ProtectedRoute onNavigate={navigateTo}><DemandLetterWizard onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    }
+    if (view === 'admin_appeal') {
+      if (!memoizedUser) {
+        return (
+          <motion.div
+            key="auth-redirect-appeal"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-12"
+          >
+            <AuthWizard 
+              onComplete={() => {}}
+              onBack={() => navigateTo('home')}
+              initialType="user"
+            />
+          </motion.div>
+        );
+      }
+      return <ProtectedRoute onNavigate={navigateTo}><AdminAppealWizard onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    }
+    if (view === 'divorce') {
+      if (!memoizedUser) {
+        return (
+          <motion.div
+            key="auth-redirect-divorce"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-12"
+          >
+            <AuthWizard 
+              onComplete={() => {}}
+              onBack={() => navigateTo('home')}
+              initialType="user"
+            />
+          </motion.div>
+        );
+      }
+      return <ProtectedRoute onNavigate={navigateTo}><DivorceWizard onBack={() => navigateTo('home')} /></ProtectedRoute>;
+    }
     if (view === 'correction') return <ProtectedRoute onNavigate={navigateTo}><CorrectionGuard onBack={() => navigateTo('home')} onConsultLawyer={() => navigateTo('lawyer_review')} /></ProtectedRoute>;
     if (view === 'exhibit') return <ProtectedRoute onNavigate={navigateTo}><AutoExhibit onBack={() => navigateTo('home')} /></ProtectedRoute>;
     if (view === 'customer_center') return <CustomerCenter onBack={() => navigateTo('home')} />;
@@ -807,7 +945,7 @@ export default function App() {
               <div className="w-16 h-16 border-4 border-brand-100 border-t-brand-600 rounded-full animate-spin" />
               <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-brand-600 animate-pulse" />
             </div>
-            <p className="text-slate-500 font-medium animate-pulse">솔로로 AI 엔진을 불러오는 중...</p>
+            <p className="text-slate-500 font-medium animate-pulse">SoloLaw AI 엔진을 불러오는 중...</p>
           </div>
         }>
           <AnimatePresence mode="wait">
@@ -862,7 +1000,7 @@ export default function App() {
   );
 }
 
-function FeatureCard({ icon, title, description, onClick, color, primary, badge }: { 
+const FeatureCard = React.memo(function FeatureCard({ icon, title, description, onClick, color, primary, badge }: { 
   icon: React.ReactNode; 
   title: string; 
   description: string; 
@@ -898,4 +1036,4 @@ function FeatureCard({ icon, title, description, onClick, color, primary, badge 
       </div>
     </button>
   );
-}
+});

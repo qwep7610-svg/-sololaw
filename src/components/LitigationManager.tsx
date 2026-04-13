@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, Heart, RefreshCw, Loader2 } from 'lucide-react';
 import { generateMentalCareMessage } from '../services/gemini';
@@ -61,7 +61,7 @@ export default function LitigationManager({
     localStorage.setItem(LITIGATION_STORAGE_KEY, JSON.stringify(data));
   }, [data]);
 
-  const handleRefreshMessage = async () => {
+  const handleRefreshMessage = React.useCallback(async () => {
     setIsGeneratingMessage(true);
     try {
       const message = await generateMentalCareMessage({
@@ -75,7 +75,7 @@ export default function LitigationManager({
     } finally {
       setIsGeneratingMessage(false);
     }
-  };
+  }, [data.progress, data.deadlines]);
 
   return (
     <div className="space-y-6">

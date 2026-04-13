@@ -267,7 +267,7 @@ export default function LawyerMatching({ primaryCategory, keywords, userCaseSumm
           <p className="text-xs text-slate-700 font-bold">변호사법 위반 방지를 위한 안내</p>
           <p className="text-[11px] text-slate-500 leading-relaxed">
             본 정보는 지역별로 등록된 변호사 회원들의 유료 광고 정보를 포함하고 있습니다. 
-            '솔로로'는 사건의 수임이나 알선에 관여하지 않으며, 사용자가 직접 변호사의 경력과 정보를 확인하여 상담 여부를 결정해야 합니다. 
+            'SoloLaw'는 사건의 수임이나 알선에 관여하지 않으며, 사용자가 직접 변호사의 경력과 정보를 확인하여 상담 여부를 결정해야 합니다. 
             모든 상담 및 계약은 변호사와 사용자 간의 직거래로 이루어집니다.
           </p>
         </div>

@@ -193,7 +193,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
             className="space-y-8"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-3xl font-bold text-[#0F172A] font-serif">나홀로소송 도우미 솔로로(SoloLaw)에 오신 것을 환영합니다</h2>
+              <h2 className="text-3xl font-bold text-[#0F172A] font-serif">나홀로소송 도우미 (SoloLaw)에 오신 것을 환영합니다</h2>
               <p className="text-[#64748B]">당신의 든든한 법률 페이스메이커가 되어 드릴게요.</p>
             </div>
 

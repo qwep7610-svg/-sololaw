@@ -58,7 +58,7 @@ export default function LitigationAIHelper({
                 <div className="bg-white/20 p-1.5 rounded-lg">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <span className="font-bold">솔로로 AI 가이드</span>
+                <span className="font-bold">SoloLaw AI 가이드</span>
               </div>
               <button 
                 onClick={() => setIsOpen(false)}

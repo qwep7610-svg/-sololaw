@@ -49,14 +49,25 @@ export default function DocumentSummarizer({ onBack }: { onBack: () => void }) {
 
   const startCamera = async () => {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("브라우저가 카메라 접근을 지원하지 않습니다.");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsCameraActive(true);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Camera access denied:", err);
-      alert("카메라에 접근할 수 없습니다. 권한을 확인해 주세요.");
+      let message = "카메라에 접근할 수 없습니다.";
+      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        message = "연결된 카메라 장치를 찾을 수 없습니다.";
+      } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        message = "카메라 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해 주세요.";
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        message = "카메라가 이미 다른 프로그램에서 사용 중입니다.";
+      }
+      alert(message);
     }
   };
 

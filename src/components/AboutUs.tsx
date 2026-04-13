@@ -49,11 +49,11 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
     );
   }
 
-  const aboutHeroTitle = config?.aboutHeroTitle || '법은 멀고 비용은 높지만,\n솔로로는 당신 곁에 있습니다.';
-  const aboutHeroDescription = config?.aboutHeroDescription || "주식회사 솔로로는 복잡한 법 절차와 높은 수임료 장벽 앞에서 망설이는 '나홀로 소송족'을 위한 AI 법률 서류 작성 보조 플랫폼입니다.\n우리는 누구나 법적 권리를 정당하게 보호받을 수 있도록, 기술을 통해 법률 서비스의 문턱을 낮춥니다.";
+  const aboutHeroTitle = config?.aboutHeroTitle || '법은 멀고 비용은 높지만,\nSoloLaw는 당신 곁에 있습니다.';
+  const aboutHeroDescription = config?.aboutHeroDescription || "SoloLaw는 복잡한 법 절차와 높은 수임료 장벽 앞에서 망설이는 '나홀로 소송족'을 위한 AI 법률 서류 작성 보조 플랫폼입니다.\n우리는 누구나 법적 권리를 정당하게 보호받을 수 있도록, 기술을 통해 법률 서비스의 문턱을 낮춥니다.";
   const aboutMissionTitle = config?.aboutMissionTitle || '법률 서비스의 민주화와\n정보 비대칭 해소';
   const aboutMissionDescription = config?.aboutMissionDescription || '전문가의 도움 없이는 시작조차 어렵던 소송 절차를 AI 기술로 자동화하여, 누구나 합리적인 비용으로 완결성 있는 법률 문서를 작성할 수 있는 환경을 만듭니다.';
-  const aboutCtaText = config?.aboutCtaText || '"혼자 하는 소송, 하지만 결코 혼자가 아닙니다.\n당신의 법적 여정에 솔로로가 함께하겠습니다."';
+  const aboutCtaText = config?.aboutCtaText || '"혼자 하는 소송, 하지만 결코 혼자가 아닙니다.\n당신의 법적 여정에 SoloLaw가 함께하겠습니다."';
 
   const getIcon = (iconName: string) => {
     switch (iconName) {
@@ -125,15 +125,15 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6 max-w-3xl"
           >
-            <Logo size="lg" text={config?.appName || "SoloLaw"} subtext={config?.appSubtext || "주식회사 솔로로"} />
+            <Logo size="lg" text={config?.appName || "SoloLaw"} subtext={config?.appSubtext || "SoloLaw"} />
             <h1 className="text-4xl md:text-6xl font-bold text-[#0F172A] font-serif leading-tight whitespace-pre-line">
               {aboutHeroTitle.split('\n').map((line: string, i: number) => (
                 <span key={`hero-line-${i}`}>
-                  {line.includes('솔로로') ? (
+                  {line.includes('SoloLaw') ? (
                     <>
-                      {line.split('솔로로')[0]}
-                      <span className="text-brand-600">솔로로</span>
-                      {line.split('솔로로')[1]}
+                      {line.split('SoloLaw')[0]}
+                      <span className="text-brand-600">SoloLaw</span>
+                      {line.split('SoloLaw')[1]}
                     </>
                   ) : line}
                   {i < aboutHeroTitle.split('\n').length - 1 && <br />}
@@ -218,7 +218,7 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-600 rounded-full text-sm font-bold uppercase tracking-wider">
             <Gem className="w-4 h-4" /> Core Values
           </div>
-          <h2 className="text-3xl md:text-5xl font-bold text-[#0F172A] font-serif">솔로로의 핵심 가치</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-[#0F172A] font-serif">SoloLaw의 핵심 가치</h2>
         </div>
 
         <div className="grid md:grid-cols-3 gap-12">
@@ -272,7 +272,7 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
               <div className="bg-slate-900 rounded-[2rem] p-8 text-white space-y-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-brand-600/20 rounded-full blur-3xl" />
                 <h3 className="text-2xl font-bold font-serif">지금 바로 파트너로<br />함께하세요</h3>
-                <p className="text-slate-400 text-sm">솔로로는 변호사법을 준수하며 전문가와 상생하는 생태계를 만듭니다.</p>
+                <p className="text-slate-400 text-sm">SoloLaw는 변호사법을 준수하며 전문가와 상생하는 생태계를 만듭니다.</p>
                 <button className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-brand-900/20">
                   전문가 등록 문의하기
                 </button>

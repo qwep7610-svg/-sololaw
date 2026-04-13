@@ -105,7 +105,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
     const impId = (import.meta as any).env.VITE_PORTONE_IMP_ID;
     if (!impId) {
       console.error("PortOne Merchant ID (VITE_PORTONE_IMP_ID) is missing.");
-      alert("결제 시스템 설정이 완료되지 않았습니다. 관리자에게 문의해 주세요.");
+      alert("등록된 PG 설정 정보가 없습니다. 관리자에게 문의하여 VITE_PORTONE_IMP_ID 환경 변수를 설정해 주세요.");
       return;
     }
 
@@ -335,7 +335,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
               <div className="space-y-2">
                 <h4 className="text-xl font-bold font-serif">파트너십 혜택</h4>
                 <p className="text-brand-50 text-xs leading-relaxed font-medium">
-                  솔로로 파트너 변호사가 되시면 AI 기반의 맞춤형 광고와 지역 타겟팅을 통해 더 많은 의뢰인을 만날 수 있습니다.
+                  SoloLaw 파트너 변호사가 되시면 AI 기반의 맞춤형 광고와 지역 타겟팅을 통해 더 많은 의뢰인을 만날 수 있습니다.
                 </p>
               </div>
               <ul className="space-y-3">

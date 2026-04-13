@@ -40,20 +40,20 @@ interface BrandingConfig {
 export const BrandingSettings: React.FC = () => {
   const [config, setConfig] = useState<BrandingConfig>({
     appName: 'SoloLaw',
-    appSubtext: '솔로로 도우미',
+    appSubtext: 'SoloLaw 도우미',
     logoUrl: null,
     primaryColor: '#2563EB',
-    heroTitle: '어렵고 복잡한 법률 절차,\n이제 솔로로 AI가 해결해 드립니다.',
+    heroTitle: '어렵고 복잡한 법률 절차,\n이제 SoloLaw AI가 해결해 드립니다.',
     heroDescription: '변호사 없이도 완벽하게. 일상어로 설명하면 전문가 수준의 법률 문서를 즉시 생성합니다.\n지금 바로 등록하고 당신만의 스마트한 법률 도우미를 만나보세요.',
     heroTitleSize: 60,
     heroTitleFont: 'serif',
     heroDescriptionSize: 18,
     heroDescriptionFont: 'sans',
-    aboutHeroTitle: '법은 멀고 비용은 높지만,\n솔로로는 당신 곁에 있습니다.',
-    aboutHeroDescription: "주식회사 솔로로는 복잡한 법 절차와 높은 수임료 장벽 앞에서 망설이는 '나홀로 소송족'을 위한 AI 법률 서류 작성 보조 플랫폼입니다.\n우리는 누구나 법적 권리를 정당하게 보호받을 수 있도록, 기술을 통해 법률 서비스의 문턱을 낮춥니다.",
+    aboutHeroTitle: '법은 멀고 비용은 높지만,\nSoloLaw는 당신 곁에 있습니다.',
+    aboutHeroDescription: "SoloLaw는 복잡한 법 절차와 높은 수임료 장벽 앞에서 망설이는 '나홀로 소송족'을 위한 AI 법률 서류 작성 보조 플랫폼입니다.\n우리는 누구나 법적 권리를 정당하게 보호받을 수 있도록, 기술을 통해 법률 서비스의 문턱을 낮춥니다.",
     aboutMissionTitle: '법률 서비스의 민주화와\n정보 비대칭 해소',
     aboutMissionDescription: '전문가의 도움 없이는 시작조차 어렵던 소송 절차를 AI 기술로 자동화하여, 누구나 합리적인 비용으로 완결성 있는 법률 문서를 작성할 수 있는 환경을 만듭니다.',
-    aboutCtaText: '"혼자 하는 소송, 하지만 결코 혼자가 아닙니다.\n당신의 법적 여정에 솔로로가 함께하겠습니다."',
+    aboutCtaText: '"혼자 하는 소송, 하지만 결코 혼자가 아닙니다.\n당신의 법적 여정에 SoloLaw가 함께하겠습니다."',
     services: [
       {
         title: "AI 나홀로 소송 가이드",
@@ -312,7 +312,7 @@ export const BrandingSettings: React.FC = () => {
               className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all h-24 resize-none"
               placeholder="메인 타이틀을 입력하세요 (줄바꿈 가능)"
             />
-            <p className="text-xs text-slate-400 mt-1">'솔로로 AI' 텍스트는 자동으로 강조 색상이 적용됩니다.</p>
+            <p className="text-xs text-slate-400 mt-1">'SoloLaw AI' 텍스트는 자동으로 강조 색상이 적용됩니다.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

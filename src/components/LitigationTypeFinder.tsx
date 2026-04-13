@@ -153,7 +153,7 @@ export default function LitigationTypeFinder({ onBack, onStartComplaint }: { onB
               ))}
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              솔로로 AI는 대한민국 법령과 최신 판례를 바탕으로 가장 적합한 절차를 안내합니다.
+              SoloLaw AI는 대한민국 법령과 최신 판례를 바탕으로 가장 적합한 절차를 안내합니다.
             </p>
           </div>
         </div>

@@ -111,31 +111,30 @@ export async function generateComplaint(data: {
   evidence: string;
 }) {
   const prompt = `
-## 역할 (Role)
-당신은 대한민국 법률 서비스 '솔로로(SoloLaw)'의 전문 법률 비서입니다. 사용자가 일상어로 작성한 사연을 바탕으로 법원에 제출 가능한 수준의 정교한 '소장(Complaint)' 초안을 생성합니다.
+[Role]
+당신은 대한민국 민사소송 전문 법률 비서입니다. 사용자의 일상적인 언어를 법률적인 용어로 재구성하여 법원에 제출 가능한 수준의 소장 초안을 작성합니다.
 
-## 입력 정보 (Input Data)
-- 소송 유형: ${data.type || '일반 민사'}
-- 당사자 관계: ${data.relationship}
-- 사건 개요: ${data.summary}
-- 청구 금액: ${data.amount}
-- 보유 증거: ${data.evidence}
+[Input Data]
+원고/피고 관계: ${data.relationship}
+사건 개요: ${data.summary}
+청구 금액: ${data.amount}
+핵심 증거: ${data.evidence}
 
-## 작성 지침 (Instructions)
-1. **법률 용어 변환**: 사용자의 일상적인 표현(예: "돈 떼였어요", "때렸어요")을 정확한 법률 용어(예: "대여금 반환 채무 불이행", "불법행위에 기한 손해배상")로 변환하여 작성하세요.
-2. **논리적 구조**: 
-   - **청구취지**: 법적 형식에 맞게 명확하게 작성 (예: 피고는 원고에게 ...원 및 이에 대한 ...부터의 지연손해금을 지급하라).
-   - **청구원인**: 
-     - 1. 당사자들의 관계
-     - 2. 사건의 발생 경위 (시간 순서대로 상세히)
-     - 3. 피고의 법적 책임 (민법 등 관련 법조문 언급)
-     - 4. 결론
-3. **증거 정리**: 보유 증거를 '갑 제1호증' 등으로 명명하여 청구원인 내용과 연결하세요.
-4. **어조**: 간결하고 명확하며, 재판부에 호소력 있는 전문적인 법률 문체를 사용하세요.
+[Task Instructions]
+청구취지: 법적 형식에 맞춰 정확히 작성하십시오. (예: 피고는 원고에게 금 000원을 지급하라. 지연손해금 포함)
+청구원인: 다음의 소송 구조에 맞춰 논리적으로 서술하십시오.
+1. 당사자들의 관계
+2. 사건의 경위 (시간 순서)
+3. 피고의 책임 및 의무 (법적 근거 언급)
+4. 결론 (재판부에 요청하는 바)
 
-## 출력 형식 (Format)
-마크다운 형식을 사용하여 소장 양식에 맞춰 출력하세요.
-마지막에 '### 💡 나홀로 소송 팁' 섹션을 추가하여 해당 소송에서 유의할 점을 조언하세요.
+입증방법: 사용자가 제시한 증거를 '갑 제1호증' 등으로 번호를 매겨 정리하십시오.
+
+주의사항: 법률 용어(예: 최고, 변제, 부당이득 등)를 적절히 사용하되, 문장은 명확하고 간결해야 합니다.
+
+[Output Format]
+소장 양식에 맞춰 제목, 당사자, 청구취지, 청구원인 순으로 출력하세요. 마크다운 형식을 사용하세요.
+마지막에 '### 💡 SoloLaw 소송 팁' 섹션을 추가하여 해당 소송에서 유의할 점을 조언하세요.
 `;
 
   const response = await safeGenerate("gemini-3-flash-preview", {
@@ -187,7 +186,6 @@ export async function summarizeDocument(input: { text?: string; file?: { data: s
 핵심 요약: 이 문서의 결론이 무엇인가? (한 문장)
 사용자의 유불리: 이 문서가 사용자에게 유리한가, 불리한가? 그 이유는?
 다음 행동 가이드: 사용자가 지금 당장 해야 할 일은 무엇인가? (예: 2주 내로 항소장 제출, 증거 보완 등)
-관련 법적 참고: 이 문서와 관련된 법령이나 판례를 찾아볼 수 있는 링크나 키워드를 제시하세요.
 
 [Tone]
 권위적인 태도를 버리고 친절하고 차분하게 설명하세요.
@@ -808,7 +806,7 @@ export async function generateLitigationGuide(data: {
 }) {
   const prompt = `
 [Role]
-당신은 대한민국 법률 서비스 '솔로로(SoloLaw)'의 친절한 AI 법률 비서 '솔로로 봇'입니다. 
+당신은 대한민국 법률 서비스 'SoloLaw'의 친절한 AI 법률 비서 'SoloLaw 봇'입니다. 
 사용자가 현재 소송 관리 대시보드에서 어떤 기능을 사용해야 할지, 그리고 현재 단계에서 무엇을 주의해야 할지 가이드해 줍니다.
 
 [Input Data]
@@ -818,7 +816,7 @@ export async function generateLitigationGuide(data: {
 
 [Task Instructions]
 1. 현재 단계(${data.currentStep})에서 사용자가 가장 먼저 해야 할 행동을 추천하세요.
-2. '소장 작성', '변호사 검토', '서류 요약' 등 솔로로의 주요 기능을 어떻게 활용하면 좋을지 설명하세요.
+2. '소장 작성', '변호사 검토', '서류 요약' 등 SoloLaw의 주요 기능을 어떻게 활용하면 좋을지 설명하세요.
 3. 사용자가 당황하지 않도록 차분하고 명확하게 안내하세요.
 4. 답변은 3~4개의 불렛 포인트로 간결하게 작성하세요.
 
@@ -836,7 +834,7 @@ export async function generateLitigationGuide(data: {
 export async function classifyLitigationType(userSituation: string) {
   const prompt = `
 ## 역할 (Role)
-당신은 대한민국 법률 서비스 '솔로로(SoloLaw)'의 지능형 분류 도우미입니다. 사용자가 겪고 있는 억울한 상황이나 분쟁 내용을 분석하여 가장 적합한 소송 유형을 분류하고, 절차의 핵심을 안내합니다.
+당신은 대한민국 법률 서비스 'SoloLaw'의 지능형 분류 도우미입니다. 사용자가 겪고 있는 억울한 상황이나 분쟁 내용을 분석하여 가장 적합한 소송 유형을 분류하고, 절차의 핵심을 안내합니다.
 
 ## 소송 분류 기준 (Classification Rules)
 사용자의 입력을 다음 5가지 카테고리 중 하나로 분류하세요.
@@ -883,7 +881,7 @@ ${userSituation}
 export async function analyzeUserCase(userCaseInput: string) {
   const prompt = `
 [Role]
-당신은 법률 플랫폼 '솔로로(SoloLaw)'의 지능형 분류 시스템입니다. 사용자의 사건 요약을 바탕으로 가장 적합한 변호사 전문 분야를 결정합니다.
+당신은 법률 플랫폼 'SoloLaw'의 지능형 분류 시스템입니다. 사용자의 사건 요약을 바탕으로 가장 적합한 변호사 전문 분야를 결정합니다.
 
 [Context]
 사용자 입력 내용: "${userCaseInput}"
@@ -957,7 +955,7 @@ export async function generateSettlementReport(data: {
 }) {
   const prompt = `
 [Role]
-당신은 '솔로로' 플랫폼의 재무 관리자입니다. 파트너 변호사에게 한 달간의 솔루션 이용 내역과 정산액을 보고합니다.
+당신은 'SoloLaw' 플랫폼의 재무 관리자입니다. 파트너 변호사에게 한 달간의 솔루션 이용 내역과 정산액을 보고합니다.
 
 [Input]
 변호사 성명: ${data.lawyerName}
@@ -972,7 +970,7 @@ export async function generateSettlementReport(data: {
 솔루션 시스템 이용료: ${data.platformFee.toLocaleString()}원
 최종 정산 금액: ${data.finalSettlement.toLocaleString()}원
 
-안내사항: 본 정산액은 귀하가 사용한 '솔로로' IT 솔루션 비용을 공제한 금액입니다. 수임료 중개 수수료를 포함하고 있지 않습니다.
+안내사항: 본 정산액은 귀하가 사용한 'SoloLaw' IT 솔루션 비용을 공제한 금액입니다. 수임료 중개 수수료를 포함하고 있지 않습니다.
 `;
 
   const response = await safeGenerate("gemini-3-flash-preview", {
@@ -1148,7 +1146,7 @@ JSON 형식으로 출력하세요. (마크다운 코드 블록 없이 순수 JSO
       category: analysis.category,
       keywords: analysis.keywords,
       lawyers: matchedLawyers.length > 0 ? matchedLawyers : data.lawyers.slice(0, 3),
-      disclaimer: "본 정보는 지역별로 등록된 변호사 회원들의 유료 광고 정보를 포함하고 있습니다. '솔로로'는 사건의 수임이나 알선에 관여하지 않으며, 사용자가 직접 변호사의 경력과 정보를 확인하여 상담 여부를 결정해야 합니다. 모든 상담 및 계약은 변호사와 사용자 간의 직거래로 이루어집니다."
+      disclaimer: "본 정보는 지역별로 등록된 변호사 회원들의 유료 광고 정보를 포함하고 있습니다. 'SoloLaw'는 사건의 수임이나 알선에 관여하지 않으며, 사용자가 직접 변호사의 경력과 정보를 확인하여 상담 여부를 결정해야 합니다. 모든 상담 및 계약은 변호사와 사용자 간의 직거래로 이루어집니다."
     };
   } catch (e) {
     console.error("Failed to match lawyers:", e);
@@ -1331,7 +1329,7 @@ export async function generateLawyerReviewReport(data: {
 4. 최종 의견: 변호사의 종합 의견.
 
 [Constraint]
-모든 수정 제안은 "본 변호사의 개인적인 법률 견해이며, 플랫폼인 '나홀로소송 도우미 솔로로(SoloLaw)'의 의견이 아님"을 하단에 명시하세요.
+모든 수정 제안은 "본 변호사의 개인적인 법률 견해이며, 플랫폼인 '나홀로소송 도우미 (SoloLaw)'의 의견이 아님"을 하단에 명시하세요.
 
 [Output Format]
 마크다운 형식을 사용하세요.
@@ -1347,7 +1345,7 @@ export async function generateLawyerReviewReport(data: {
 export async function generateReviewServiceCopy() {
   const prompt = `
 [Role]
-당신은 '나홀로소송 도우미 솔로로(SoloLaw)'의 서비스 기획자입니다. AI가 쓴 서류에 불안함을 느끼는 사용자에게 '변호사 유료 검토'의 필요성을 설명하고 신청을 유도합니다.
+당신은 '나홀로소송 도우미 (SoloLaw)'의 서비스 기획자입니다. AI가 쓴 서류에 불안함을 느끼는 사용자에게 '변호사 유료 검토'의 필요성을 설명하고 신청을 유도합니다.
 
 [Task]
 1. 불안 해소: "AI가 잘 썼는지 걱정되시나요? 전문 변호사의 눈으로 한 번 더 확인하면 서류 반려 확률이 낮아집니다."
@@ -1377,7 +1375,7 @@ export async function generateLawyerMarketingCopy(data: {
 }) {
   const prompt = `
 [Role]
-당신은 법률 플랫폼 '솔로로'의 변호사 홍보 전문 카피라이터입니다.
+당신은 법률 플랫폼 'SoloLaw'의 변호사 홍보 전문 카피라이터입니다.
 
 [Input Data]
 성함: ${data.name}
