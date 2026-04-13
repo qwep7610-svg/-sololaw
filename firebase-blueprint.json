@@ -195,9 +195,14 @@
       "description": "Global application branding and content settings",
       "type": "object",
       "properties": {
+        "companyName": { "type": "string" },
         "appName": { "type": "string" },
         "appSubtext": { "type": "string" },
         "logoUrl": { "type": "string" },
+        "featureVisibility": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
         "heroTitle": { "type": "string" },
         "heroDescription": { "type": "string" },
         "aboutHeroTitle": { "type": "string" },
@@ -227,8 +232,36 @@
             }
           }
         },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
       }
+    },
+    "content": {
+      "title": "Content",
+      "description": "Legal guides, notices, and FAQ data",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["guide", "notice", "faq"] },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "title", "body"]
+    },
+    "log": {
+      "title": "System Log",
+      "description": "System access records and admin configuration changes",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "ip": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["action", "timestamp"]
     }
   },
   "firestore": {
@@ -279,6 +312,14 @@
     "/app_settings/branding": {
       "schema": "app_settings",
       "description": "Global branding and CMS settings"
+    },
+    "/contents/{contentId}": {
+      "schema": "content",
+      "description": "Legal guides, notices, and FAQ"
+    },
+    "/logs/{logId}": {
+      "schema": "log",
+      "description": "System and audit logs"
     }
   }
 }

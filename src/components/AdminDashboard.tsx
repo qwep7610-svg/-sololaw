@@ -27,7 +27,9 @@ import {
   ChevronRight,
   MessageSquare,
   Plus,
-  Palette
+  Palette,
+  Settings2,
+  Wallet
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -49,7 +51,84 @@ import { useAuth } from '../lib/AuthContext';
 import PolicyEditor from './PolicyEditor';
 import BrandingSettings from './BrandingSettings';
 
-type AdminTab = 'verification' | 'monitoring' | 'revenue' | 'security' | 'stats' | 'policies' | 'branding';
+type AdminTab = 'verification' | 'monitoring' | 'revenue' | 'security' | 'stats' | 'policies' | 'branding' | 'payments';
+
+const AdminFeatureManager = ({ branding }: { branding: any }) => {
+  
+  const toggleVisibility = async (featureId: string) => {
+    const docRef = doc(db, 'app_settings', 'branding');
+    const currentStatus = branding.featureVisibility?.[featureId] ?? true;
+    
+    try {
+      if (!branding.featureVisibility) {
+        await updateDoc(docRef, {
+          featureVisibility: { [featureId]: !currentStatus }
+        });
+      } else {
+        await updateDoc(docRef, {
+          [`featureVisibility.${featureId}`]: !currentStatus
+        });
+      }
+    } catch (error) {
+      console.error("기능 노출 설정 업데이트 실패:", error);
+    }
+  };
+
+  const featureList = [
+    { id: 'litigation_finder', name: '소송 유형 찾기' },
+    { id: 'complaint_wizard', name: '소장 작성 마법사' },
+    { id: 'demand_letter', name: '내용증명 생성' },
+    { id: 'admin_appeal', name: '행정심판 청구' },
+    { id: 'divorce', name: '이혼 소송 지원' },
+    { id: 'lawyer_search', name: '변호사 찾기' },
+    { id: 'lawyer_review', name: '변호사 서류 검토' },
+    { id: 'cost_calculator', name: '소송 비용 계산기' },
+    { id: 'summarizer', name: '판례/문서 요약' },
+    { id: 'correction', name: '보정명령 대응' },
+    { id: 'exhibit', name: '증거 자동 정리' },
+    { id: 'lawyer_reg', name: '변호사 홍보 등록' },
+    { id: 'customer_center', name: '고객센터' },
+    { id: 'about', name: '회사 소개' },
+  ];
+
+  return (
+    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+      <div className="flex items-center gap-2 mb-6 text-slate-800">
+        <Settings2 className="w-5 h-5 text-brand-600" />
+        <h3 className="font-bold text-lg">서비스 기능 노출 관리</h3>
+      </div>
+
+      <div className="mb-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+        <p className="text-sm text-blue-700 leading-relaxed">
+          <strong>💡 관리자 안내:</strong> 기능을 숨기더라도 관리자 계정으로는 메인 화면에서 해당 기능을 계속 확인하고 테스트할 수 있습니다. (숨김 상태는 "숨김(관리자용)" 배지로 표시됩니다.) 일반 사용자에게 어떻게 보이는지 확인하려면 메인 화면 상단의 <strong>'사용자 뷰'</strong> 버튼을 클릭하세요.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {featureList.map((f) => {
+          const isVisible = branding.featureVisibility?.[f.id] !== false;
+          
+          return (
+            <div key={f.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-all">
+              <span className="font-semibold text-slate-700">{f.name}</span>
+              <button
+                onClick={() => toggleVisibility(f.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                  isVisible 
+                  ? 'bg-brand-600 text-white' 
+                  : 'bg-slate-200 text-slate-500'
+                }`}
+              >
+                {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                {isVisible ? '공개 중' : '숨김 완료'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('verification');
@@ -79,6 +158,8 @@ export default function AdminDashboard() {
   const [verificationStep, setVerificationStep] = useState<{ lawyerId: string, step: 1 | 2 | 3 } | null>(null);
   const [rejectionModal, setRejectionModal] = useState<{ show: boolean, lawyer: any } | null>(null);
   const [customRejectionReason, setCustomRejectionReason] = useState('');
+  const [branding, setBranding] = useState<any>(null);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
   // Stats data (mock for now, in real app would come from Firestore aggregations)
   const caseStats = [
@@ -151,6 +232,24 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.LIST, 'admin_access_logs');
     });
 
+    // Fetch branding settings
+    const brandingRef = doc(db, 'app_settings', 'branding');
+    const unsubscribeBranding = onSnapshot(brandingRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setBranding(docSnap.data());
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'app_settings/branding');
+    });
+
+    // Fetch subscriptions
+    const subscriptionsQuery = query(collection(db, 'subscriptions'), orderBy('createdAt', 'desc'));
+    const unsubscribeSubscriptions = onSnapshot(subscriptionsQuery, (snapshot) => {
+      setSubscriptions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'subscriptions');
+    });
+
     return () => {
       unsubscribeLawyers();
       unsubscribeApproved();
@@ -158,6 +257,8 @@ export default function AdminDashboard() {
       unsubscribeAds();
       unsubscribeSettlements();
       unsubscribeLogs();
+      unsubscribeBranding();
+      unsubscribeSubscriptions();
     };
   }, [user]);
 
@@ -413,6 +514,23 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCancelSubscription = async (subId: string) => {
+    if (!confirm('정말로 이 구독을 취소하시겠습니까?')) return;
+    
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'subscriptions', subId), {
+        status: 'inactive',
+        updatedAt: serverTimestamp()
+      });
+      alert('구독이 취소되었습니다.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `subscriptions/${subId}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const calculateLawyerStats = (lawyerId: string) => {
     const lawyerRequests = reviewRequests.filter(r => r.lawyerId === lawyerId && r.status === 'completed');
     const pendingRequests = lawyerRequests.filter(r => r.settlementStatus === 'pending');
@@ -450,6 +568,7 @@ export default function AdminDashboard() {
             { id: 'revenue', label: '정산/광고', icon: CreditCard },
             { id: 'security', label: '보안/로그', icon: Lock },
             { id: 'stats', label: '통계 리포트', icon: BarChart3 },
+            { id: 'payments', label: '결제 관리', icon: Wallet },
             { id: 'policies', label: '정책 관리', icon: FileText },
             { id: 'branding', label: '브랜딩 설정', icon: Palette },
           ].map((tab) => (
@@ -981,8 +1100,138 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
           >
+            {branding && <AdminFeatureManager branding={branding} />}
             <BrandingSettings />
+          </motion.div>
+        )}
+
+        {activeTab === 'payments' && (
+          <motion.div
+            key="payments"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            {/* Subscription Management Section */}
+            <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-[#F1F5F9] flex items-center justify-between">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-brand-600" />
+                  구독 관리 (변호사 멤버십)
+                </h3>
+                <span className="text-xs font-medium px-2 py-1 bg-brand-50 text-brand-600 rounded-full">
+                  활성 구독: {subscriptions.filter(s => s.status === 'active').length}건
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-slate-400 border-b border-slate-50">
+                      <th className="p-6 font-bold">변호사 ID</th>
+                      <th className="p-6 font-bold">플랜</th>
+                      <th className="p-6 font-bold">결제 금액</th>
+                      <th className="p-6 font-bold">다음 결제일</th>
+                      <th className="p-6 font-bold">상태</th>
+                      <th className="p-6 font-bold text-right">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {subscriptions.map((sub) => (
+                      <tr key={sub.id} className="hover:bg-slate-50/50 transition-all">
+                        <td className="p-6 font-medium text-slate-700">{sub.lawyerId}</td>
+                        <td className="p-6">
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
+                            sub.planType === 'premium' ? 'bg-purple-100 text-purple-600' :
+                            sub.planType === 'standard' ? 'bg-blue-100 text-blue-600' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                            {sub.planType}
+                          </span>
+                        </td>
+                        <td className="p-6 font-bold text-slate-900">{sub.amount?.toLocaleString()}원</td>
+                        <td className="p-6 text-slate-500">{sub.nextBillingDate?.toDate().toLocaleDateString()}</td>
+                        <td className="p-6">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                            sub.status === 'active' ? 'bg-green-100 text-green-600' :
+                            sub.status === 'failed' ? 'bg-red-100 text-red-600' :
+                            'bg-slate-100 text-slate-400'
+                          }`}>
+                            {sub.status === 'active' ? '활성' : sub.status === 'failed' ? '결제 실패' : '비활성'}
+                          </span>
+                        </td>
+                        <td className="p-6 text-right">
+                          {sub.status === 'active' && (
+                            <button
+                              onClick={() => handleCancelSubscription(sub.id)}
+                              className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors"
+                            >
+                              구독 취소
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {subscriptions.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-12 text-center text-slate-400">
+                          구독 내역이 없습니다.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Payment History Section */}
+            <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-[#F1F5F9]">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <History className="w-5 h-5 text-brand-600" />
+                  결제 내역 (서류 검토 서비스)
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-slate-400 border-b border-slate-50">
+                      <th className="p-6 font-bold">결제 일시</th>
+                      <th className="p-6 font-bold">사용자</th>
+                      <th className="p-6 font-bold">변호사</th>
+                      <th className="p-6 font-bold">결제 금액</th>
+                      <th className="p-6 font-bold">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {reviewRequests.filter(r => r.paymentAmount > 0).map((req) => (
+                      <tr key={req.id} className="hover:bg-slate-50/50 transition-all">
+                        <td className="p-6 text-slate-500">{req.createdAt?.toDate().toLocaleString()}</td>
+                        <td className="p-6 font-medium text-slate-700">{req.userDisplayName}</td>
+                        <td className="p-6 text-slate-600">{req.lawyerDisplayName || '미지정'}</td>
+                        <td className="p-6 font-bold text-brand-600">{req.paymentAmount?.toLocaleString()}원</td>
+                        <td className="p-6">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                            req.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
+                          }`}>
+                            {req.status === 'completed' ? '검토 완료' : '진행 중'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {reviewRequests.filter(r => r.paymentAmount > 0).length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-12 text-center text-slate-400">
+                          결제 내역이 없습니다.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

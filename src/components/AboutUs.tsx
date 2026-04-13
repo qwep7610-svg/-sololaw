@@ -4,7 +4,7 @@ import { ArrowLeft, Rocket, Wrench, Gem, Handshake, ShieldCheck, Users, Zap, Sca
 import { Logo } from './Logo';
 import { db, doc, getDoc } from '../lib/firebase';
 
-export default function AboutUs({ onBack }: { onBack: () => void }) {
+export default function AboutUs({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (view: string) => void }) {
   const [config, setConfig] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -273,7 +273,10 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-brand-600/20 rounded-full blur-3xl" />
                 <h3 className="text-2xl font-bold font-serif">지금 바로 파트너로<br />함께하세요</h3>
                 <p className="text-slate-400 text-sm">SoloLaw는 변호사법을 준수하며 전문가와 상생하는 생태계를 만듭니다.</p>
-                <button className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-brand-900/20">
+                <button 
+                  onClick={() => onNavigate?.('lawyer_reg')}
+                  className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-brand-900/20"
+                >
                   전문가 등록 문의하기
                 </button>
               </div>

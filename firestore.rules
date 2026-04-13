@@ -50,10 +50,32 @@ service cloud.firestore {
     // Collection: app_settings
     // Document ID: branding
     // Fields:
+    //   - companyName: string
     //   - appName: string (required)
     //   - appSubtext: string
     //   - logoUrl: string (null or string)
+    //   - featureVisibility: map
     //   - updatedAt: timestamp
+    //   - updatedBy: string
+    //
+    // Collection: contents
+    // Document ID: {contentId}
+    // Fields:
+    //   - type: string (guide, notice, faq)
+    //   - title: string
+    //   - body: string
+    //   - category: string
+    //   - createdAt: timestamp
+    //   - updatedAt: timestamp
+    //
+    // Collection: logs
+    // Document ID: {logId}
+    // Fields:
+    //   - userId: string
+    //   - action: string
+    //   - details: string
+    //   - ip: string
+    //   - timestamp: timestamp
     //
     // ===============================================================
 
@@ -222,6 +244,7 @@ service cloud.firestore {
     function isValidBranding(data) {
       return data.keys().hasAll(['appName']) &&
              data.appName is string && data.appName.size() <= 100 &&
+             (!('companyName' in data) || data.companyName is string) &&
              (!('appSubtext' in data) || data.appSubtext is string) &&
              (!('logoUrl' in data) || data.logoUrl == null || data.logoUrl is string) &&
              (!('heroTitle' in data) || data.heroTitle is string) &&
@@ -233,7 +256,22 @@ service cloud.firestore {
              (!('aboutCtaText' in data) || data.aboutCtaText is string) &&
              (!('services' in data) || data.services is list) &&
              (!('values' in data) || data.values is list) &&
-             (!('updatedAt' in data) || data.updatedAt is timestamp);
+             (!('featureVisibility' in data) || data.featureVisibility is map) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+             (!('updatedBy' in data) || data.updatedBy is string);
+    }
+
+    function isValidContent(data) {
+      return data.keys().hasAll(['type', 'title', 'body']) &&
+             data.type in ['guide', 'notice', 'faq'] &&
+             data.title is string && data.title.size() <= 200 &&
+             data.body is string && data.body.size() <= 50000;
+    }
+
+    function isValidLog(data) {
+      return data.keys().hasAll(['action', 'timestamp']) &&
+             data.action is string &&
+             data.timestamp is timestamp;
     }
 
     // ===============================================================
@@ -340,6 +378,17 @@ service cloud.firestore {
       allow create: if isLawyer() && isValidSubscription(request.resource.data);
       allow update: if isAdmin() || (isOwner(subscriptionId) && isValidSubscription(request.resource.data)) || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid && isValidSubscription(request.resource.data));
       allow delete: if isAdmin();
+    }
+
+    match /contents/{contentId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidContent(request.resource.data);
+    }
+
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidLog(request.resource.data);
+      allow update, delete: if false;
     }
   }
 }

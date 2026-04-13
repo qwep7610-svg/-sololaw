@@ -1,6 +1,6 @@
 import React, { useState, lazy, Suspense, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Scale, FileText, MessageSquare, Info, ChevronRight, Gavel, History, ShieldAlert, ListOrdered, TrendingUp, Building2, Mail, LogIn, LogOut, User as UserIcon, Loader2, Calculator, Heart, Menu, X, ShieldCheck, Camera, UserPlus, Briefcase, Clock, XCircle, MapPin, Sparkles, CreditCard, Activity } from 'lucide-react';
+import { Scale, FileText, MessageSquare, Info, ChevronRight, Gavel, History, ShieldAlert, ListOrdered, TrendingUp, Building2, Mail, LogIn, LogOut, User as UserIcon, Loader2, Calculator, Heart, Menu, X, ShieldCheck, Camera, UserPlus, Briefcase, Clock, XCircle, MapPin, Sparkles, CreditCard, Activity, Eye } from 'lucide-react';
 import LitigationManager from './components/LitigationManager';
 import LawyerAdCard from './components/LawyerAdCard';
 import { useAuth } from './lib/AuthContext';
@@ -45,6 +45,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isAdminPreview, setIsAdminPreview] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [authType, setAuthType] = useState<'user' | 'lawyer' | undefined>(undefined);
   const [showTerms, setShowTerms] = useState(false);
@@ -61,6 +62,7 @@ export default function App() {
     heroDescriptionFont?: 'serif' | 'sans';
     services?: any[];
     values?: any[];
+    featureVisibility?: Record<string, boolean>;
   }>({
     appName: 'SoloLaw',
     appSubtext: 'SoloLaw 도우미',
@@ -72,7 +74,8 @@ export default function App() {
     heroDescriptionSize: 18,
     heroDescriptionFont: 'sans',
     services: [],
-    values: []
+    values: [],
+    featureVisibility: {}
   });
 
   const startComplaintWizard = (type?: string) => {
@@ -106,7 +109,8 @@ export default function App() {
           heroDescriptionSize: data.heroDescriptionSize || 18,
           heroDescriptionFont: data.heroDescriptionFont || 'sans',
           services: data.services || [],
-          values: data.values || []
+          values: data.values || [],
+          featureVisibility: data.featureVisibility || {}
         });
       }
     }, (error) => {
@@ -138,6 +142,9 @@ export default function App() {
   const memoizedUser = useMemo(() => user, [user]);
 
   const renderMainContent = () => {
+    const isAdmin = memoizedUser?.role === 'admin' && isAdminPreview;
+    const visibility = memoizedBranding.featureVisibility || {};
+
     if (loading) {
       return (
         <div key="loading" className="flex flex-col items-center justify-center py-24 gap-4">
@@ -356,162 +363,223 @@ export default function App() {
             />
           </div>
 
-          <div className="space-y-8">
-            <div className="flex items-center gap-3 px-4">
-              <div className="w-1 h-8 bg-brand-600 rounded-full" />
-              <h3 className="text-2xl font-bold text-[#0F172A]">주요 기능</h3>
+          {(visibility['litigation_finder'] !== false || 
+            visibility['complaint_wizard'] !== false || 
+            visibility['demand_letter'] !== false || 
+            visibility['admin_appeal'] !== false || 
+            visibility['divorce'] !== false || isAdmin) && (
+            <div className="space-y-8">
+              <div className="flex items-center gap-3 px-4">
+                <div className="w-1 h-8 bg-brand-600 rounded-full" />
+                <h3 className="text-2xl font-bold text-[#0F172A]">주요 기능</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(visibility['litigation_finder'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<Scale className="w-8 h-8 text-brand-600" />}
+                    title="소송 유형 자동 분류"
+                    description="지금 겪고 계신 상황을 설명해 주세요. AI가 민사, 가사, 형사 등 가장 적합한 소송 유형을 찾아드리고 핵심 준비 사항을 안내합니다."
+                    onClick={() => navigateTo('litigation_finder')}
+                    color="bg-brand-50"
+                    primary
+                    badge={visibility['litigation_finder'] === false ? "숨김(관리자용)" : "추천"}
+                  />
+                )}
+                {(visibility['complaint_wizard'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<FileText className="w-8 h-8 text-indigo-600" />}
+                    title="소장 초안 작성"
+                    description="복잡한 법률 용어를 몰라도 괜찮습니다. 질문에 답하기만 하면 논리적인 소장 초안이 완성됩니다."
+                    onClick={() => startComplaintWizard()}
+                    color="bg-indigo-50"
+                    primary
+                    badge={visibility['complaint_wizard'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+                {(visibility['demand_letter'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<Mail className="w-8 h-8 text-orange-600" />}
+                    title="내용증명 생성"
+                    description="상대방에게 심리적 압박과 법적 경고를 동시에 전달하는 전략적 내용증명을 작성합니다."
+                    onClick={() => navigateTo('demand_letter')}
+                    color="bg-orange-50"
+                    badge={visibility['demand_letter'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+                {(visibility['admin_appeal'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<Building2 className="w-8 h-8 text-brand-600" />}
+                    title="행정심판 청구"
+                    description="영업정지 등 부당한 행정처분에 대응하는 청구서와 집행정지 신청서를 자동으로 생성합니다."
+                    onClick={() => navigateTo('admin_appeal')}
+                    color="bg-brand-50"
+                    badge={visibility['admin_appeal'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+                {(visibility['divorce'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<Heart className="w-8 h-8 text-red-600" />}
+                    title="이혼 소송 지원"
+                    description="재산분할 기여도 소명 및 위자료 청구 등 이혼 소송에 필요한 핵심 문서를 전문적으로 지원합니다."
+                    onClick={() => navigateTo('divorce')}
+                    color="bg-red-50"
+                    badge={visibility['divorce'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <FeatureCard 
-                icon={<Scale className="w-8 h-8 text-brand-600" />}
-                title="소송 유형 자동 분류"
-                description="지금 겪고 계신 상황을 설명해 주세요. AI가 민사, 가사, 형사 등 가장 적합한 소송 유형을 찾아드리고 핵심 준비 사항을 안내합니다."
-                onClick={() => navigateTo('litigation_finder')}
-                color="bg-brand-50"
-                primary
-                badge="추천"
-              />
-              <FeatureCard 
-                icon={<FileText className="w-8 h-8 text-indigo-600" />}
-                title="소장 초안 작성"
-                description="복잡한 법률 용어를 몰라도 괜찮습니다. 질문에 답하기만 하면 논리적인 소장 초안이 완성됩니다."
-                onClick={() => startComplaintWizard()}
-                color="bg-indigo-50"
-                primary
-              />
-              <FeatureCard 
-                icon={<Mail className="w-8 h-8 text-orange-600" />}
-                title="내용증명 생성"
-                description="상대방에게 심리적 압박과 법적 경고를 동시에 전달하는 전략적 내용증명을 작성합니다."
-                onClick={() => navigateTo('demand_letter')}
-                color="bg-orange-50"
-              />
-              <FeatureCard 
-                icon={<Building2 className="w-8 h-8 text-brand-600" />}
-                title="행정심판 청구"
-                description="영업정지 등 부당한 행정처분에 대응하는 청구서와 집행정지 신청서를 자동으로 생성합니다."
-                onClick={() => navigateTo('admin_appeal')}
-                color="bg-brand-50"
-              />
-              <FeatureCard 
-                icon={<Heart className="w-8 h-8 text-red-600" />}
-                title="이혼 소송 지원"
-                description="재산분할 기여도 소명 및 위자료 청구 등 이혼 소송에 필요한 핵심 문서를 전문적으로 지원합니다."
-                onClick={() => navigateTo('divorce')}
-                color="bg-red-50"
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-8">
-            <div className="flex items-center gap-3 px-4">
-              <div className="w-1 h-8 bg-emerald-600 rounded-full" />
-              <h3 className="text-2xl font-bold text-[#0F172A]">전문가 연계</h3>
+          {(visibility['lawyer_search'] !== false || 
+            visibility['lawyer_review'] !== false || isAdmin) && (
+            <div className="space-y-8">
+              <div className="flex items-center gap-3 px-4">
+                <div className="w-1 h-8 bg-emerald-600 rounded-full" />
+                <h3 className="text-2xl font-bold text-[#0F172A]">전문가 연계</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {(visibility['lawyer_search'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<MapPin className="w-8 h-8 text-emerald-600" />}
+                    title="내 지역 변호사 찾기"
+                    description="현재 위치나 관할 법원 근처에서 활동 중인 전문 변호사를 직접 검색하고 상담을 신청하세요."
+                    onClick={() => navigateTo('lawyer_search')}
+                    color="bg-emerald-50"
+                    badge={visibility['lawyer_search'] === false ? "숨김(관리자용)" : "지역 기반"}
+                    primary
+                  />
+                )}
+                {(visibility['lawyer_review'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<ShieldCheck className="w-8 h-8 text-brand-600" />}
+                    title="변호사 서류 검토"
+                    description="AI가 작성한 초안을 파트너 변호사에게 직접 검토받아 법적 완성도를 높이세요."
+                    onClick={() => navigateTo('lawyer_review')}
+                    color="bg-brand-50"
+                    badge={visibility['lawyer_review'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FeatureCard 
-                icon={<MapPin className="w-8 h-8 text-emerald-600" />}
-                title="내 지역 변호사 찾기"
-                description="현재 위치나 관할 법원 근처에서 활동 중인 전문 변호사를 직접 검색하고 상담을 신청하세요."
-                onClick={() => navigateTo('lawyer_search')}
-                color="bg-emerald-50"
-                badge="지역 기반"
-                primary
-              />
-              <FeatureCard 
-                icon={<ShieldCheck className="w-8 h-8 text-brand-600" />}
-                title="변호사 서류 검토"
-                description="AI가 작성한 초안을 파트너 변호사에게 직접 검토받아 법적 완성도를 높이세요."
-                onClick={() => navigateTo('lawyer_review')}
-                color="bg-brand-50"
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-8">
-            <div className="flex items-center gap-3 px-4">
-              <div className="w-1 h-8 bg-brand-600 rounded-full" />
-              <h3 className="text-2xl font-bold text-[#0F172A]">법률 도구</h3>
+          {(visibility['cost_calculator'] !== false || 
+            visibility['summarizer'] !== false || isAdmin) && (
+            <div className="space-y-8">
+              <div className="flex items-center gap-3 px-4">
+                <div className="w-1 h-8 bg-brand-600 rounded-full" />
+                <h3 className="text-2xl font-bold text-[#0F172A]">법률 도구</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {(visibility['cost_calculator'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<Calculator className="w-8 h-8 text-brand-600" />}
+                    title="소송 비용 계산"
+                    description="소가(소송물가액)를 산정하고, 인지대와 송달료 등 실제 법원에 납부할 비용을 계산합니다."
+                    onClick={() => navigateTo('cost')}
+                    color="bg-brand-50"
+                    badge={visibility['cost_calculator'] === false ? "숨김(관리자용)" : "신규 기능"}
+                  />
+                )}
+                {(visibility['summarizer'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<FileText className="w-8 h-8 text-[#059669]" />}
+                    title="판례/문서 요약"
+                    description="복잡한 판결문이나 상대방의 답변서를 초등학생도 이해할 수 있을 만큼 쉽게 요약해 드립니다."
+                    onClick={() => navigateTo('summarizer')}
+                    color="bg-emerald-50"
+                    badge={visibility['summarizer'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FeatureCard 
-                icon={<Calculator className="w-8 h-8 text-brand-600" />}
-                title="소송 비용 계산"
-                description="소가(소송물가액)를 산정하고, 인지대와 송달료 등 실제 법원에 납부할 비용을 계산합니다."
-                onClick={() => navigateTo('cost')}
-                color="bg-brand-50"
-                badge="신규 기능"
-              />
-              <FeatureCard 
-                icon={<FileText className="w-8 h-8 text-[#059669]" />}
-                title="판례/문서 요약"
-                description="복잡한 판결문이나 상대방의 답변서를 초등학생도 이해할 수 있을 만큼 쉽게 요약해 드립니다."
-                onClick={() => navigateTo('summarizer')}
-                color="bg-emerald-50"
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-8">
-            <div className="flex items-center gap-3 px-4">
-              <div className="w-1 h-8 bg-slate-400 rounded-full" />
-              <h3 className="text-2xl font-bold text-[#0F172A]">기타 서비스</h3>
+          {(visibility['correction'] !== false || 
+            visibility['exhibit'] !== false || 
+            visibility['lawyer_review'] !== false || 
+            visibility['lawyer_reg'] !== false || isAdmin) && (
+            <div className="space-y-8">
+              <div className="flex items-center gap-3 px-4">
+                <div className="w-1 h-8 bg-slate-400 rounded-full" />
+                <h3 className="text-2xl font-bold text-[#0F172A]">기타 서비스</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(visibility['correction'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<ShieldAlert className="w-8 h-8 text-red-600" />}
+                    title="보정명령 대응"
+                    description="법원의 보정명령서를 분석하여 무엇이 잘못되었는지 짚어주고, 수정된 답변 초안을 제시합니다."
+                    onClick={() => navigateTo('correction')}
+                    color="bg-red-50"
+                    badge={visibility['correction'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+                {(visibility['exhibit'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<ListOrdered className="w-8 h-8 text-emerald-600" />}
+                    title="증거 자동 정리"
+                    description="사진, 영수증, 계약서 등을 업로드하면 AI가 번호를 부여하고 증거설명서 초안을 작성합니다."
+                    onClick={() => navigateTo('exhibit')}
+                    color="bg-emerald-50"
+                    badge={visibility['exhibit'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+                {(visibility['lawyer_review'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<ShieldCheck className="w-8 h-8 text-brand-600" />}
+                    title="전문가 유료 검토"
+                    description="AI가 작성한 서류를 전문 변호사가 직접 검토하고 보완해 드립니다. (정액 이용료 발생)"
+                    onClick={() => navigateTo('lawyer_review')}
+                    color="bg-brand-50"
+                    badge={visibility['lawyer_review'] === false ? "숨김(관리자용)" : "추천"}
+                  />
+                )}
+                {(visibility['lawyer_reg'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<UserPlus className="w-8 h-8 text-brand-600" />}
+                    title="변호사 홍보 등록"
+                    description="변호사님의 경력을 등록하고 AI를 통해 최적화된 광고 카드를 생성하여 홍보하세요."
+                    onClick={() => navigateTo('lawyer_reg')}
+                    color="bg-brand-50"
+                    badge={visibility['lawyer_reg'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <FeatureCard 
-                icon={<ShieldAlert className="w-8 h-8 text-red-600" />}
-                title="보정명령 대응"
-                description="법원의 보정명령서를 분석하여 무엇이 잘못되었는지 짚어주고, 수정된 답변 초안을 제시합니다."
-                onClick={() => navigateTo('correction')}
-                color="bg-red-50"
-              />
-              <FeatureCard 
-                icon={<ListOrdered className="w-8 h-8 text-emerald-600" />}
-                title="증거 자동 정리"
-                description="사진, 영수증, 계약서 등을 업로드하면 AI가 번호를 부여하고 증거설명서 초안을 작성합니다."
-                onClick={() => navigateTo('exhibit')}
-                color="bg-emerald-50"
-              />
-              <FeatureCard 
-                icon={<ShieldCheck className="w-8 h-8 text-brand-600" />}
-                title="전문가 유료 검토"
-                description="AI가 작성한 서류를 전문 변호사가 직접 검토하고 보완해 드립니다. (정액 이용료 발생)"
-                onClick={() => navigateTo('lawyer_review')}
-                color="bg-brand-50"
-                badge="추천"
-              />
-              <FeatureCard 
-                icon={<UserPlus className="w-8 h-8 text-brand-600" />}
-                title="변호사 홍보 등록"
-                description="변호사님의 경력을 등록하고 AI를 통해 최적화된 광고 카드를 생성하여 홍보하세요."
-                onClick={() => navigateTo('lawyer_reg')}
-                color="bg-brand-50"
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-8">
-            <div className="flex items-center gap-3 px-4">
-              <div className="w-1 h-8 bg-brand-600 rounded-full" />
-              <h3 className="text-2xl font-bold text-[#0F172A]">고객 지원</h3>
+          {(visibility['customer_center'] !== false || 
+            visibility['about'] !== false || isAdmin) && (
+            <div className="space-y-8">
+              <div className="flex items-center gap-3 px-4">
+                <div className="w-1 h-8 bg-brand-600 rounded-full" />
+                <h3 className="text-2xl font-bold text-[#0F172A]">고객 지원</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(visibility['customer_center'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<MessageSquare className="w-8 h-8 text-brand-600" />}
+                    title="고객센터"
+                    description="서비스 이용 중 궁금한 점이나 불편한 사항이 있으시면 언제든지 문의해 주세요."
+                    onClick={() => navigateTo('customer_center')}
+                    color="bg-brand-50"
+                    badge={visibility['customer_center'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+                {(visibility['about'] !== false || isAdmin) && (
+                  <FeatureCard 
+                    icon={<Info className="w-8 h-8 text-indigo-600" />}
+                    title="회사 소개"
+                    description="SoloLaw AI를 만드는 사람들과 우리의 비전을 소개합니다."
+                    onClick={() => navigateTo('about')}
+                    color="bg-indigo-50"
+                    badge={visibility['about'] === false ? "숨김(관리자용)" : undefined}
+                  />
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <FeatureCard 
-                icon={<MessageSquare className="w-8 h-8 text-brand-600" />}
-                title="고객센터"
-                description="서비스 이용 중 궁금한 점이나 불편한 사항이 있으시면 언제든지 문의해 주세요."
-                onClick={() => navigateTo('customer_center')}
-                color="bg-brand-50"
-              />
-              <FeatureCard 
-                icon={<Info className="w-8 h-8 text-indigo-600" />}
-                title="회사 소개"
-                description="SoloLaw AI를 만드는 사람들과 우리의 비전을 소개합니다."
-                onClick={() => navigateTo('about')}
-                color="bg-indigo-50"
-              />
-            </div>
-          </div>
+          )}
         </motion.div>
       );
     }
@@ -669,7 +737,7 @@ export default function App() {
     if (view === 'correction') return <ProtectedRoute onNavigate={navigateTo}><CorrectionGuard onBack={() => navigateTo('home')} onConsultLawyer={() => navigateTo('lawyer_review')} /></ProtectedRoute>;
     if (view === 'exhibit') return <ProtectedRoute onNavigate={navigateTo}><AutoExhibit onBack={() => navigateTo('home')} /></ProtectedRoute>;
     if (view === 'customer_center') return <CustomerCenter onBack={() => navigateTo('home')} />;
-    if (view === 'about') return <AboutUs onBack={() => navigateTo('home')} />;
+    if (view === 'about') return <AboutUs onBack={() => navigateTo('home')} onNavigate={navigateTo} />;
     if (view === 'security') return <ProtectedRoute onNavigate={navigateTo}><SecuritySettings onBack={() => navigateTo('home')} /></ProtectedRoute>;
     if (view === 'admin') return <ProtectedRoute requiredRole="admin" onNavigate={navigateTo}><AdminDashboard /></ProtectedRoute>;
 
@@ -717,6 +785,20 @@ export default function App() {
             </nav>
 
             <div className="flex items-center gap-2">
+              {memoizedUser?.role === 'admin' && (
+                <button
+                  onClick={() => setIsAdminPreview(!isAdminPreview)}
+                  className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                    isAdminPreview 
+                    ? 'bg-brand-50 border-brand-200 text-brand-700' 
+                    : 'bg-slate-50 border-slate-200 text-slate-500'
+                  }`}
+                  title={isAdminPreview ? "관리자 모드 (모든 기능 노출)" : "사용자 모드 (설정된 기능만 노출)"}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  {isAdminPreview ? "관리자 뷰" : "사용자 뷰"}
+                </button>
+              )}
               <div className="relative">
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin text-[#64748B]" />
