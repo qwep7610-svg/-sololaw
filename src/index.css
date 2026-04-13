@@ -20,7 +20,7 @@
 
 @layer base {
   body {
-    @apply bg-[#FDFCFB] text-[#1E293B] antialiased break-keep;
+    @apply bg-[#FDFCFB] text-[#1E293B] antialiased break-words;
   }
   
   h1, h2, h3, h4 {

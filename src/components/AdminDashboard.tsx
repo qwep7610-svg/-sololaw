@@ -647,77 +647,77 @@ export default function AdminDashboard() {
                   </div>
                 ) : (
                   filteredLawyers.map((lawyer) => (
-                    <div key={lawyer.id} className="p-6 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
-                            {lawyer.profileImageUrl ? (
-                              <img src={lawyer.profileImageUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <Users className="w-6 h-6 text-slate-400" />
+                      <div key={lawyer.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                              {lawyer.profileImageUrl ? (
+                                <img src={lawyer.profileImageUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Users className="w-6 h-6 text-slate-400" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-[#0F172A] truncate">{lawyer.name} 변호사</h4>
+                                {lawyer.status === 'approved' && <ShieldCheck className="w-4 h-4 text-brand-600 shrink-0" />}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <button 
+                                  onClick={() => handleCopyAndSearch(lawyer.regNumber)}
+                                  className="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-lg hover:bg-brand-100 transition-all flex items-center gap-1 whitespace-nowrap"
+                                >
+                                  <ExternalLink className="w-3 h-3" /> 대한변협 자격 조회
+                                </button>
+                                <span className="text-[10px] text-slate-400 truncate">등록번호: {lawyer.regNumber} | {lawyer.location}</span>
+                              </div>
+                              <p className="text-[10px] md:text-xs text-slate-400 mt-1">신청일: {lawyer.createdAt?.toDate().toLocaleString()}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            {lawyer.status === 'pending' && (
+                              <button 
+                                onClick={() => setVerificationStep({ lawyerId: lawyer.id, step: 1 })}
+                                className="w-full sm:w-auto px-4 py-2 bg-brand-600 text-white rounded-xl text-xs md:text-sm font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-100 whitespace-nowrap"
+                              >
+                                <ShieldCheck className="w-4 h-4" />
+                                승인 프로세스 시작
+                              </button>
+                            )}
+                            {lawyer.status === 'rejected' && (
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <span className="text-[10px] md:text-xs font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full">반려됨</span>
+                                  <p className="text-[10px] text-slate-400 mt-1">사유: {lawyer.rejectionReason}</p>
+                                </div>
+                                <button 
+                                  onClick={() => setDeleteConfirm(lawyer)}
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                  title="목록에서 삭제"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
+                            )}
+                            {lawyer.status === 'approved' && (
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <span className="text-[10px] md:text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">승인 완료</span>
+                                  <p className="text-[10px] text-slate-400 mt-1">승인일: {lawyer.approvedAt?.toDate().toLocaleString()}</p>
+                                </div>
+                                <button 
+                                  onClick={() => setDeleteConfirm(lawyer)}
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                  title="목록에서 삭제"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-[#0F172A]">{lawyer.name} 변호사</h4>
-                              {lawyer.status === 'approved' && <ShieldCheck className="w-4 h-4 text-brand-600" />}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <button 
-                                onClick={() => handleCopyAndSearch(lawyer.regNumber)}
-                                className="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-lg hover:bg-brand-100 transition-all flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-3 h-3" /> 대한변협 자격 조회
-                              </button>
-                              <span className="text-[10px] text-slate-400">등록번호: {lawyer.regNumber} | {lawyer.location}</span>
-                            </div>
-                            <p className="text-xs text-slate-400 mt-1">신청일: {lawyer.createdAt?.toDate().toLocaleString()}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {lawyer.status === 'pending' && (
-                            <button 
-                              onClick={() => setVerificationStep({ lawyerId: lawyer.id, step: 1 })}
-                              className="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 transition-all flex items-center gap-2 shadow-lg shadow-brand-100"
-                            >
-                              <ShieldCheck className="w-4 h-4" />
-                              승인 프로세스 시작
-                            </button>
-                          )}
-                          {lawyer.status === 'rejected' && (
-                            <div className="flex items-center gap-3">
-                              <div className="text-right">
-                                <span className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full">반려됨</span>
-                                <p className="text-[10px] text-slate-400 mt-1">사유: {lawyer.rejectionReason}</p>
-                              </div>
-                              <button 
-                                onClick={() => setDeleteConfirm(lawyer)}
-                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                title="목록에서 삭제"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            </div>
-                          )}
-                          {lawyer.status === 'approved' && (
-                            <div className="flex items-center gap-3">
-                              <div className="text-right">
-                                <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">승인 완료</span>
-                                <p className="text-[10px] text-slate-400 mt-1">승인일: {lawyer.approvedAt?.toDate().toLocaleString()}</p>
-                              </div>
-                              <button 
-                                onClick={() => setDeleteConfirm(lawyer)}
-                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                title="목록에서 삭제"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
-                    </div>
-                  ))
+                    ))
                 )}
               </div>
             </div>
@@ -740,8 +740,8 @@ export default function AdminDashboard() {
                 </h3>
               </div>
               <div className="p-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
+                <div className="overflow-x-auto -mx-6 px-6">
+                  <table className="w-full text-left min-w-[800px]">
                     <thead>
                       <tr className="text-xs font-bold text-[#64748B] uppercase tracking-wider border-b border-slate-100">
                         <th className="pb-4 px-4">신청일</th>
@@ -761,9 +761,9 @@ export default function AdminDashboard() {
 
                         return (
                           <tr key={req.id} className="text-sm hover:bg-slate-50/50 transition-colors">
-                            <td className="py-4 px-4 text-slate-500">{createdAt?.toLocaleString()}</td>
-                            <td className="py-4 px-4 font-bold">{req.userDisplayName}</td>
-                            <td className="py-4 px-4">
+                            <td className="py-4 px-4 text-slate-500 whitespace-nowrap">{createdAt?.toLocaleString()}</td>
+                            <td className="py-4 px-4 font-bold whitespace-nowrap">{req.userDisplayName}</td>
+                            <td className="py-4 px-4 whitespace-nowrap">
                               {req.lawyerDisplayName ? (
                                 <span className="flex items-center gap-2">
                                   <Users className="w-4 h-4 text-brand-600" />
@@ -773,7 +773,7 @@ export default function AdminDashboard() {
                                 <span className="text-slate-400 italic">미배정</span>
                               )}
                             </td>
-                            <td className="py-4 px-4">
+                            <td className="py-4 px-4 whitespace-nowrap">
                               <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
                                 req.status === 'completed' ? 'bg-green-50 text-green-600' :
                                 req.status === 'reviewing' ? 'bg-blue-50 text-blue-600' :
@@ -782,7 +782,7 @@ export default function AdminDashboard() {
                                 {req.status === 'completed' ? '완료' : req.status === 'reviewing' ? '검토중' : '대기중'}
                               </span>
                             </td>
-                            <td className="py-4 px-4">
+                            <td className="py-4 px-4 whitespace-nowrap">
                               {isUrgent ? (
                                 <span className="flex items-center gap-1 text-red-600 font-bold animate-pulse">
                                   <AlertTriangle className="w-4 h-4" />
@@ -792,7 +792,7 @@ export default function AdminDashboard() {
                                 <span className="text-slate-400">정상</span>
                               )}
                             </td>
-                            <td className="py-4 px-4">
+                            <td className="py-4 px-4 whitespace-nowrap">
                               <button 
                                 onClick={() => handleAuditAction('SAMPLE_REPORT', req.id, (reason) => {
                                   logAdminAction('SAMPLE_REPORT', req.userId, reason);
@@ -1140,23 +1140,23 @@ export default function AdminDashboard() {
                   활성 구독: {subscriptions.filter(s => s.status === 'active').length}건
                 </span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-6 px-6">
+                <table className="w-full text-sm min-w-[800px]">
                   <thead>
                     <tr className="text-left text-slate-400 border-b border-slate-50">
-                      <th className="p-6 font-bold">변호사 ID</th>
-                      <th className="p-6 font-bold">플랜</th>
-                      <th className="p-6 font-bold">결제 금액</th>
-                      <th className="p-6 font-bold">다음 결제일</th>
-                      <th className="p-6 font-bold">상태</th>
-                      <th className="p-6 font-bold text-right">작업</th>
+                      <th className="p-6 font-bold whitespace-nowrap">변호사 ID</th>
+                      <th className="p-6 font-bold whitespace-nowrap">플랜</th>
+                      <th className="p-6 font-bold whitespace-nowrap">결제 금액</th>
+                      <th className="p-6 font-bold whitespace-nowrap">다음 결제일</th>
+                      <th className="p-6 font-bold whitespace-nowrap">상태</th>
+                      <th className="p-6 font-bold text-right whitespace-nowrap">작업</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {subscriptions.map((sub) => (
                       <tr key={sub.id} className="hover:bg-slate-50/50 transition-all">
-                        <td className="p-6 font-medium text-slate-700">{sub.lawyerId}</td>
-                        <td className="p-6">
+                        <td className="p-6 font-medium text-slate-700 whitespace-nowrap">{sub.lawyerId}</td>
+                        <td className="p-6 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
                             sub.planType === 'premium' ? 'bg-purple-100 text-purple-600' :
                             sub.planType === 'standard' ? 'bg-blue-100 text-blue-600' :
@@ -1165,9 +1165,9 @@ export default function AdminDashboard() {
                             {sub.planType}
                           </span>
                         </td>
-                        <td className="p-6 font-bold text-slate-900">{sub.amount?.toLocaleString()}원</td>
-                        <td className="p-6 text-slate-500">{sub.nextBillingDate?.toDate().toLocaleDateString()}</td>
-                        <td className="p-6">
+                        <td className="p-6 font-bold text-slate-900 whitespace-nowrap">{sub.amount?.toLocaleString()}원</td>
+                        <td className="p-6 text-slate-500 whitespace-nowrap">{sub.nextBillingDate?.toDate().toLocaleDateString()}</td>
+                        <td className="p-6 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
                             sub.status === 'active' ? 'bg-green-100 text-green-600' :
                             sub.status === 'failed' ? 'bg-red-100 text-red-600' :
@@ -1176,7 +1176,7 @@ export default function AdminDashboard() {
                             {sub.status === 'active' ? '활성' : sub.status === 'failed' ? '결제 실패' : '비활성'}
                           </span>
                         </td>
-                        <td className="p-6 text-right">
+                        <td className="p-6 text-right whitespace-nowrap">
                           {sub.status === 'active' && (
                             <button
                               onClick={() => handleCancelSubscription(sub.id)}
@@ -1218,25 +1218,25 @@ export default function AdminDashboard() {
                   결제 내역 (서류 검토 서비스)
                 </h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-6 px-6">
+                <table className="w-full text-sm min-w-[700px]">
                   <thead>
                     <tr className="text-left text-slate-400 border-b border-slate-50">
-                      <th className="p-6 font-bold">결제 일시</th>
-                      <th className="p-6 font-bold">사용자</th>
-                      <th className="p-6 font-bold">변호사</th>
-                      <th className="p-6 font-bold">결제 금액</th>
-                      <th className="p-6 font-bold">상태</th>
+                      <th className="p-6 font-bold whitespace-nowrap">결제 일시</th>
+                      <th className="p-6 font-bold whitespace-nowrap">사용자</th>
+                      <th className="p-6 font-bold whitespace-nowrap">변호사</th>
+                      <th className="p-6 font-bold whitespace-nowrap">결제 금액</th>
+                      <th className="p-6 font-bold whitespace-nowrap">상태</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {reviewRequests.filter(r => r.paymentAmount > 0).map((req) => (
                       <tr key={req.id} className="hover:bg-slate-50/50 transition-all">
-                        <td className="p-6 text-slate-500">{req.createdAt?.toDate().toLocaleString()}</td>
-                        <td className="p-6 font-medium text-slate-700">{req.userDisplayName}</td>
-                        <td className="p-6 text-slate-600">{req.lawyerDisplayName || '미지정'}</td>
-                        <td className="p-6 font-bold text-brand-600">{req.paymentAmount?.toLocaleString()}원</td>
-                        <td className="p-6">
+                        <td className="p-6 text-slate-500 whitespace-nowrap">{req.createdAt?.toDate().toLocaleString()}</td>
+                        <td className="p-6 font-medium text-slate-700 whitespace-nowrap">{req.userDisplayName}</td>
+                        <td className="p-6 text-slate-600 whitespace-nowrap">{req.lawyerDisplayName || '미지정'}</td>
+                        <td className="p-6 font-bold text-brand-600 whitespace-nowrap">{req.paymentAmount?.toLocaleString()}원</td>
+                        <td className="p-6 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
                             req.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
                           }`}>
