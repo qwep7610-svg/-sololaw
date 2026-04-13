@@ -1,0 +1,345 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string
+    //   - photoURL: string
+    //   - role: string (user, admin, lawyer)
+    //   - isExpert: bool
+    //   - is2FAEnabled: bool
+    //   - twoFactorSecret: string
+    //
+    // Collection: users/{userId}/history
+    // Document ID: {historyId}
+    // Fields:
+    //   - userId: string (required)
+    //   - type: string (required, enum)
+    //   - title: string (required, max 200)
+    //   - content: string (required, max 100000)
+    //   - data: map
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: lawyer_profiles
+    // Document ID: {userId}
+    // Fields:
+    //   - userId: string (required)
+    //   - name: string (required, max 100)
+    //   - experience: string (required, max 500)
+    //   - specialty: string (max 200)
+    //   - cases: string (max 2000)
+    //   - message: string (max 500)
+    //   - photo: string (max 1000000)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: lawyer_profile_history
+    // Document ID: {historyId}
+    // Fields:
+    //   - userId: string (required)
+    //   - profileData: map (required)
+    //   - modifiedAt: timestamp (required)
+    //   - ipAddress: string
+    //
+    // Collection: app_settings
+    // Document ID: branding
+    // Fields:
+    //   - appName: string (required)
+    //   - appSubtext: string
+    //   - logoUrl: string (null or string)
+    //   - updatedAt: timestamp
+    //
+    // ===============================================================
+
+    // Collection: lawyers
+    // Document ID: {lawyerId}
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - regNumber: string (required)
+    //   - location: string
+    //   - status: string (pending, approved, rejected)
+    //   - createdAt: timestamp
+    //
+    // Collection: admin_access_logs
+    // Document ID: {logId}
+    // Fields:
+    //   - adminId: string (required)
+    //   - adminName: string
+    //   - action: string (required)
+    //   - targetUser: string (required)
+    //   - reason: string (required)
+    //   - timestamp: timestamp (required)
+    //
+    // Collection: review_requests
+    // Document ID: {requestId}
+    // Fields:
+    //   - userId: string (required)
+    //   - userDisplayName: string (required)
+    //   - lawyerId: string (optional)
+    //   - lawyerDisplayName: string (optional)
+    //   - status: string (required, enum: pending, assigned, reviewing, completed)
+    //   - userDraft: string (required, max 100000)
+    //   - lawyerNotes: string
+    //   - report: string
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == "qwep7610@naver.com") ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isLawyer() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'lawyer';
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Validation Functions
+    // ===============================================================
+
+    function isValidUser(data) {
+      return (data.keys().hasAll(['uid', 'email']) || (request.method == 'update')) &&
+             (!('uid' in data) || data.uid == request.auth.uid) &&
+             (!('email' in data) || isValidEmail(data.email)) &&
+             (!('role' in data) || (data.role in ['user', 'admin', 'lawyer'])) &&
+             (!('isRegistered' in data) || data.isRegistered is bool) &&
+             (!('isExpert' in data) || data.isExpert is bool) &&
+             (!('is2FAEnabled' in data) || data.is2FAEnabled is bool) &&
+             (!('twoFactorSecret' in data) || (data.twoFactorSecret is string && data.twoFactorSecret.size() <= 100));
+    }
+
+    function isValidHistory(data) {
+      return data.keys().hasAll(['userId', 'type', 'title', 'content', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
+             data.content is string && data.content.size() <= 100000 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidLawyerProfile(data) {
+      return data.keys().hasAll(['userId', 'name', 'experience', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             data.name is string &&
+             data.experience is string &&
+             (!('specialty' in data) || data.specialty == null || data.specialty is string) &&
+             (!('cases' in data) || data.cases == null || data.cases is string) &&
+             (!('message' in data) || data.message == null || data.message is string) &&
+             (!('photo' in data) || data.photo == null || data.photo is string) &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidLawyerHistory(data) {
+      return data.keys().hasAll(['userId', 'profileData', 'modifiedAt']) &&
+             data.userId == request.auth.uid &&
+             data.profileData is map &&
+             data.modifiedAt is timestamp;
+    }
+
+    function isValidLawyerRegistration(data) {
+      return (data.keys().hasAll(['name', 'email', 'regNumber', 'status', 'location']) || (request.method == 'update')) &&
+             (!('email' in data) || isValidEmail(data.email)) &&
+             (!('status' in data) || data.status in ['pending', 'approved', 'rejected']) &&
+             (!('location' in data) || (data.location is string && data.location.size() > 0)) &&
+             (!('isExpert' in data) || data.isExpert is bool) &&
+             (!('reviewPrice' in data) || data.reviewPrice is number) &&
+             (!('settlementCycle' in data) || data.settlementCycle is string);
+    }
+
+    function isValidAdminLog(data) {
+      return data.keys().hasAll(['adminId', 'action', 'targetUser', 'reason', 'timestamp']) &&
+             data.adminId == request.auth.uid &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidReviewRequest(data) {
+      return data.keys().hasAll(['userId', 'userDisplayName', 'status', 'userDraft', 'createdAt', 'updatedAt', 'paymentAmount']) &&
+             data.userId is string &&
+             data.userDisplayName is string &&
+             data.status in ['pending', 'assigned', 'reviewing', 'completed'] &&
+             data.userDraft is string && data.userDraft.size() <= 100000 &&
+             data.paymentAmount is number &&
+             (!('pgFee' in data) || data.pgFee is number) &&
+             (!('platformFee' in data) || data.platformFee is number) &&
+             (!('settlementAmount' in data) || data.settlementAmount is number) &&
+             (!('settlementStatus' in data) || data.settlementStatus in ['pending', 'completed']) &&
+             (!('lawyerId' in data) || data.lawyerId == null || data.lawyerId is string) &&
+             (!('lawyerDisplayName' in data) || data.lawyerDisplayName == null || data.lawyerDisplayName is string) &&
+             (!('lawyerNotes' in data) || data.lawyerNotes is string) &&
+             (!('report' in data) || data.report is string) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidSettlement(data) {
+      return data.keys().hasAll(['lawyerId', 'totalAmount', 'platformFeeTotal', 'netAmount', 'status', 'createdAt']) &&
+             data.lawyerId is string &&
+             data.totalAmount is number &&
+             data.platformFeeTotal is number &&
+             data.netAmount is number &&
+             data.status in ['pending', 'completed', 'refunded'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidSubscription(data) {
+      return data.keys().hasAll(['lawyerId', 'billingKey', 'planType', 'amount', 'nextBillingDate', 'status']) &&
+             data.lawyerId == request.auth.uid &&
+             data.planType in ['basic', 'standard', 'premium'] &&
+             data.amount is number &&
+             data.nextBillingDate is timestamp &&
+             data.status in ['active', 'inactive', 'failed'];
+    }
+
+    function isValidBranding(data) {
+      return data.keys().hasAll(['appName']) &&
+             data.appName is string && data.appName.size() <= 100 &&
+             (!('appSubtext' in data) || data.appSubtext is string) &&
+             (!('logoUrl' in data) || data.logoUrl == null || data.logoUrl is string) &&
+             (!('heroTitle' in data) || data.heroTitle is string) &&
+             (!('heroDescription' in data) || data.heroDescription is string) &&
+             (!('aboutHeroTitle' in data) || data.aboutHeroTitle is string) &&
+             (!('aboutHeroDescription' in data) || data.aboutHeroDescription is string) &&
+             (!('aboutMissionTitle' in data) || data.aboutMissionTitle is string) &&
+             (!('aboutMissionDescription' in data) || data.aboutMissionDescription is string) &&
+             (!('aboutCtaText' in data) || data.aboutCtaText is string) &&
+             (!('services' in data) || data.services is list) &&
+             (!('values' in data) || data.values is list) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /app_settings/branding {
+      allow read: if true;
+      allow write: if isAdmin() && isValidBranding(request.resource.data);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data)) ||
+                      (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'isExpert']));
+      
+      match /history/{historyId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidHistory(request.resource.data);
+        allow update: if isOwner(userId) && isValidHistory(request.resource.data) &&
+                        request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    match /lawyer_profiles/{userId} {
+      allow read: if true; // Public profiles
+      allow create, update: if isOwner(userId) && isValidLawyerProfile(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /lawyer_profile_history/{historyId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource != null && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidLawyerHistory(request.resource.data);
+      allow update: if false; // Immutable audit log
+      allow delete: if isAdmin() || (isAuthenticated() && resource != null && resource.data.userId == request.auth.uid);
+    }
+
+    match /lawyers/{lawyerId} {
+      allow read: if isOwner(lawyerId) || isAdmin() || (resource != null && resource.data.status == 'approved');
+      allow create: if isOwner(lawyerId) && isValidLawyerRegistration(request.resource.data) && 
+                      request.resource.data.status == 'pending';
+      allow update: if (isAdmin() && isValidLawyerRegistration(request.resource.data)) ||
+                      (isOwner(lawyerId) && isValidLawyerRegistration(request.resource.data) && 
+                       request.resource.data.status == resource.data.status);
+      allow delete: if isAdmin();
+    }
+
+    match /lawyer_ads/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
+    }
+
+    match /admin_access_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidAdminLog(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /policies/{policyId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settlements/{settlementId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid);
+      allow write: if isAdmin() && isValidSettlement(request.resource.data);
+    }
+
+    match /ad_slots/{slotId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /review_requests/{requestId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isLawyer() ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isValidReviewRequest(request.resource.data) && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.status == 'pending';
+      allow update: if isAuthenticated() && (
+        (isAdmin() && isValidReviewRequest(request.resource.data)) ||
+        (isLawyer() && isValidReviewRequest(request.resource.data) && (
+          // Self-assignment
+          (resource.data.lawyerId == null && request.resource.data.lawyerId == request.auth.uid && request.resource.data.status == 'assigned') ||
+          // Status update by assigned lawyer
+          (resource.data.lawyerId == request.auth.uid && request.resource.data.lawyerId == request.auth.uid)
+        ))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /subscriptions/{subscriptionId} {
+      allow read: if isOwner(subscriptionId) || isAdmin() || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid);
+      allow create: if isLawyer() && isValidSubscription(request.resource.data);
+      allow update: if isAdmin() || (isOwner(subscriptionId) && isValidSubscription(request.resource.data)) || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid && isValidSubscription(request.resource.data));
+      allow delete: if isAdmin();
+    }
+  }
+}

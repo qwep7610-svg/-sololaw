@@ -1,0 +1,284 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin", "lawyer"] },
+        "is2FAEnabled": { "type": "boolean" },
+        "twoFactorSecret": { "type": "string", "description": "Hashed security PIN for 2FA" }
+      },
+      "required": ["uid", "email"]
+    },
+    "lawyer_profile": {
+      "title": "Lawyer Profile",
+      "description": "Detailed profile for lawyer users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "experience": { "type": "string" },
+        "specialty": { "type": "string" },
+        "cases": { "type": "string" },
+        "message": { "type": "string" },
+        "photo": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "experience"]
+    },
+    "lawyer_profile_history": {
+      "title": "Lawyer Profile History",
+      "description": "Audit log of lawyer profile modifications",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "profileData": { "type": "object" },
+        "modifiedAt": { "type": "string", "format": "date-time" },
+        "ipAddress": { "type": "string" }
+      },
+      "required": ["userId", "profileData", "modifiedAt"]
+    },
+    "history": {
+      "title": "Legal Document History",
+      "description": "Saved legal documents and analysis results",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["complaint", "summary", "correction", "exhibit", "prediction", "admin_appeal", "demand_letter"] },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "data": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "title", "content", "createdAt"]
+    },
+    "lawyer_registration": {
+      "title": "Lawyer Registration",
+      "description": "Registration data for lawyers awaiting approval",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "regNumber": { "type": "string" },
+        "licenseNumber": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "verificationDocUrl": { "type": "string", "description": "Temporary URL for verification documents" },
+        "isExpert": { "type": "boolean" },
+        "adSlot": { "type": "string" },
+        "reviewCount": { "type": "number" },
+        "averageResponseTime": { "type": "string" },
+        "rejectionReason": { "type": "string" },
+        "reviewPrice": { "type": "number", "description": "Price set by lawyer for document review" },
+        "settlementCycle": { "type": "string", "description": "e.g., Weekly (Mon-Sun, paid next Fri)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "approvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "regNumber", "status"]
+    },
+    "review_request": {
+      "title": "Review Request",
+      "description": "User request for lawyer document review",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "lawyerId": { "type": "string" },
+        "lawyerName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "assigned", "reviewing", "completed"] },
+        "paymentAmount": { "type": "number" },
+        "pgFee": { "type": "number" },
+        "platformFee": { "type": "number" },
+        "settlementAmount": { "type": "number" },
+        "settlementStatus": { "type": "string", "enum": ["pending", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "lawyerId", "status", "paymentAmount"]
+    },
+    "settlement": {
+      "title": "Settlement",
+      "description": "Financial settlement records for lawyers",
+      "type": "object",
+      "properties": {
+        "lawyerId": { "type": "string" },
+        "lawyerName": { "type": "string" },
+        "totalAmount": { "type": "number", "description": "Gross Revenue" },
+        "platformFeeTotal": { "type": "number", "description": "Total Platform Fee" },
+        "pgFeeTotal": { "type": "number" },
+        "netAmount": { "type": "number", "description": "Final Settlement Amount" },
+        "status": { "type": "string", "enum": ["pending", "completed", "refunded"] },
+        "period": { "type": "string", "description": "Settlement period (e.g., 2024-04)" },
+        "reviewCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "paidAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ad_slot": {
+      "title": "Ad Slot",
+      "description": "Configuration for lawyer advertisement slots",
+      "type": "object",
+      "properties": {
+        "slotId": { "type": "string" },
+        "lawyerId": { "type": "string" },
+        "lawyerName": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "bidAmount": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      }
+    },
+    "admin_access_log": {
+      "title": "Admin Access Log",
+      "description": "Log of admin access to sensitive user data",
+      "type": "object",
+      "properties": {
+        "adminId": { "type": "string" },
+        "adminName": { "type": "string" },
+        "action": { "type": "string" },
+        "targetUser": { "type": "string" },
+        "reason": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adminId", "action", "targetUser", "reason", "timestamp"]
+    },
+    "policy": {
+      "title": "Policy",
+      "description": "Service policies like terms, privacy, and legal notices",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content"]
+    },
+    "customer_center": {
+      "title": "Customer Center Config",
+      "description": "Configuration for customer support contact info and hours",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "hours": {
+          "type": "object",
+          "properties": {
+            "weekdays": { "type": "string" },
+            "lunch": { "type": "string" },
+            "weekends": { "type": "string" }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "subscription": {
+      "title": "Subscription",
+      "description": "Recurring payment subscriptions for lawyers",
+      "type": "object",
+      "properties": {
+        "lawyerId": { "type": "string" },
+        "billingKey": { "type": "string", "description": "customer_uid for PortOne" },
+        "planType": { "type": "string", "enum": ["basic", "standard", "premium"] },
+        "amount": { "type": "number" },
+        "nextBillingDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "inactive", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["lawyerId", "billingKey", "planType", "amount", "nextBillingDate", "status"]
+    },
+    "app_settings": {
+      "title": "App Settings",
+      "description": "Global application branding and content settings",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "appSubtext": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "heroTitle": { "type": "string" },
+        "heroDescription": { "type": "string" },
+        "aboutHeroTitle": { "type": "string" },
+        "aboutHeroDescription": { "type": "string" },
+        "aboutMissionTitle": { "type": "string" },
+        "aboutMissionDescription": { "type": "string" },
+        "aboutCtaText": { "type": "string" },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "desc": { "type": "string" },
+              "iconName": { "type": "string" }
+            }
+          }
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "desc": { "type": "string" },
+              "icon": { "type": "string" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profile documents"
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": "history",
+      "description": "User's saved legal documents"
+    },
+    "/lawyer_profiles/{userId}": {
+      "schema": "lawyer_profile",
+      "description": "Lawyer profile data"
+    },
+    "/lawyer_profile_history/{historyId}": {
+      "schema": "lawyer_profile_history",
+      "description": "History of lawyer profile changes"
+    },
+    "/lawyers/{lawyerId}": {
+      "schema": "lawyer_registration",
+      "description": "Lawyer registration and verification data"
+    },
+    "/review_requests/{requestId}": {
+      "schema": "review_request",
+      "description": "User requests for document review"
+    },
+    "/settlements/{settlementId}": {
+      "schema": "settlement",
+      "description": "Financial settlement records"
+    },
+    "/admin_access_logs/{logId}": {
+      "schema": "admin_access_log",
+      "description": "Logs of admin data access"
+    },
+    "/policies/{policyId}": {
+      "schema": "policy",
+      "description": "Service policies and legal notices"
+    },
+    "/config/customer_center": {
+      "schema": "customer_center",
+      "description": "Customer support contact information"
+    },
+    "/subscriptions/{subscriptionId}": {
+      "schema": "subscription",
+      "description": "Lawyer subscription records"
+    },
+    "/app_settings/branding": {
+      "schema": "app_settings",
+      "description": "Global branding and CMS settings"
+    }
+  }
+}
