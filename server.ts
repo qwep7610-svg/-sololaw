@@ -35,6 +35,77 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Toss Payments: Exchange authKey for billingKey
+  app.post("/api/toss/billing-key", async (req, res) => {
+    const { authKey, customerKey } = req.body;
+    const secretKey = process.env.TOSS_SECRET_KEY;
+
+    if (!authKey || !customerKey) {
+      return res.status(400).json({ error: "Missing authKey or customerKey" });
+    }
+
+    if (!secretKey) {
+      return res.status(500).json({ error: "TOSS_SECRET_KEY is not configured" });
+    }
+
+    try {
+      const basicAuth = Buffer.from(secretKey + ":").toString('base64');
+      const response = await axios.post(
+        "https://api.tosspayments.com/v1/billing/authorizations/issue",
+        { authKey, customerKey },
+        {
+          headers: {
+            Authorization: `Basic ${basicAuth}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      res.json(response.data);
+    } catch (error: any) {
+      console.error("Toss Billing Key Exchange Error:", error.response?.data || error.message);
+      res.status(error.response?.status || 500).json(error.response?.data || { error: "Internal Server Error" });
+    }
+  });
+
+  // Toss Payments: Charge subscription
+  app.post("/api/toss/charge", async (req, res) => {
+    const { billingKey, amount, customerKey, orderName } = req.body;
+    const secretKey = process.env.TOSS_SECRET_KEY;
+
+    if (!billingKey || !amount || !customerKey) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    if (!secretKey) {
+      return res.status(500).json({ error: "TOSS_SECRET_KEY is not configured" });
+    }
+
+    try {
+      const basicAuth = Buffer.from(secretKey + ":").toString('base64');
+      const response = await axios.post(
+        `https://api.tosspayments.com/v1/billing/${billingKey}`,
+        {
+          customerKey,
+          amount,
+          orderId: `SOLO_AD_${Date.now()}`,
+          orderName: orderName || "솔로로 파트너십 정액 광고료"
+        },
+        {
+          headers: {
+            Authorization: `Basic ${basicAuth}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      res.json(response.data);
+    } catch (error: any) {
+      console.error("Toss Charge Error:", error.response?.data || error.message);
+      res.status(error.response?.status || 500).json(error.response?.data || { error: "Internal Server Error" });
+    }
+  });
+
   // PortOne Billing Key Save API
   app.post("/api/subscriptions/billing-key", async (req, res) => {
     const { lawyerId, customer_uid, planType, amount } = req.body;
@@ -93,29 +164,51 @@ async function startServer() {
         try {
           console.log(`Processing payment for lawyer: ${sub.lawyerId} (${sub.planType})`);
           
-          // PortOne 'Again' API call logic
-          // 1. Get Access Token
-          // 2. Call /subscribe/payments/again
-          
-          /* 
-          // Example implementation (Requires PORTONE_API_KEY and SECRET)
-          const tokenRes = await axios.post('https://api.iamport.kr/users/getToken', {
-            imp_key: process.env.PORTONE_API_KEY,
-            imp_secret: process.env.PORTONE_API_SECRET
-          });
-          const accessToken = tokenRes.data.response.access_token;
+          // 1. Determine PG provider and process payment
+          if (sub.billingKey.startsWith('toss_')) {
+            // Toss Payments logic
+            const secretKey = process.env.TOSS_SECRET_KEY;
+            if (!secretKey) throw new Error("TOSS_SECRET_KEY is not configured");
+            
+            const basicAuth = Buffer.from(secretKey + ":").toString('base64');
+            const payRes = await axios.post(
+              `https://api.tosspayments.com/v1/billing/${sub.billingKey}`,
+              {
+                customerKey: sub.lawyerId,
+                amount: sub.amount,
+                orderId: `SOLO_AD_${sub.lawyerId}_${Date.now()}`,
+                orderName: `SoloLaw 변호사 정액제 광고 (${sub.planType})`
+              },
+              {
+                headers: {
+                  Authorization: `Basic ${basicAuth}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (payRes.status !== 200) throw new Error("Toss Payment failed");
+          } else {
+            // PortOne logic (Mocked for now as per original code)
+            /* 
+            const tokenRes = await axios.post('https://api.iamport.kr/users/getToken', {
+              imp_key: process.env.PORTONE_API_KEY,
+              imp_secret: process.env.PORTONE_API_SECRET
+            });
+            const accessToken = tokenRes.data.response.access_token;
 
-          const payRes = await axios.post('https://api.iamport.kr/subscribe/payments/again', {
-            customer_uid: sub.billingKey,
-            merchant_uid: `sub_${sub.lawyerId}_${Date.now()}`,
-            amount: sub.amount,
-            name: `SoloLaw 변호사 정액제 광고 (${sub.planType})`
-          }, {
-            headers: { Authorization: accessToken }
-          });
+            const payRes = await axios.post('https://api.iamport.kr/subscribe/payments/again', {
+              customer_uid: sub.billingKey,
+              merchant_uid: `sub_${sub.lawyerId}_${Date.now()}`,
+              amount: sub.amount,
+              name: `SoloLaw 변호사 정액제 광고 (${sub.planType})`
+            }, {
+              headers: { Authorization: accessToken }
+            });
 
-          if (payRes.data.code !== 0) throw new Error(payRes.data.message);
-          */
+            if (payRes.data.code !== 0) throw new Error(payRes.data.message);
+            */
+          }
 
           // Simulate successful payment for logic flow
           const nextDate = new Date(sub.nextBillingDate.toDate());

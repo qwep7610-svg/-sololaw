@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Camera, Save, Trash2, UserPlus, Image as ImageIcon, Check, AlertCircle, Sparkles, ShieldCheck, Loader2, Info, Megaphone, FileCheck, AlertTriangle, CreditCard, User as UserIcon } from 'lucide-react';
-import { db, auth, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, handleFirestoreError, OperationType } from '../lib/firebase';
+import { ArrowLeft, Camera, Save, Trash2, UserPlus, Image as ImageIcon, Check, AlertCircle, Sparkles, ShieldCheck, Loader2, Info, Megaphone, FileCheck, AlertTriangle, CreditCard, User as UserIcon, Eye } from 'lucide-react';
+import { loadTossPayments } from '@tosspayments/payment-sdk';
+import { db, auth, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, handleFirestoreError, OperationType, query, where, getDocs, limit, orderBy, onSnapshot } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { generateLawyerMarketingCopy, checkLawyerAdCompliance } from '../services/gemini';
+import SinglePlanCard from './SinglePlan';
 
 declare global {
   interface Window {
@@ -24,6 +26,9 @@ interface LawyerProfile {
   location: string;
   reviewPrice: number;
   settlementCycle: string;
+  adStatus?: string;
+  adPlan?: string;
+  adExpiryDate?: any;
 }
 
 export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
@@ -40,7 +45,10 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
     regNumber: '',
     location: '',
     reviewPrice: 50000,
-    settlementCycle: '주간 (월-일 집계 후 익주 금요일 입금)'
+    settlementCycle: '주간 (월-일 집계 후 익주 금요일 입금)',
+    adStatus: undefined,
+    adPlan: undefined,
+    adExpiryDate: undefined
   });
   const [verificationFile, setVerificationFile] = useState<{ data: string; mimeType: string } | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -64,11 +72,18 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
+  const [paymentSettings, setPaymentSettings] = useState<any>(null);
+  const [isNotifyingDeposit, setIsNotifyingDeposit] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!user) return;
+
+    let unsubscribeAd: (() => void) | null = null;
+
     async function loadProfile() {
-      if (!user) return;
+      setIsLoading(true);
       try {
         // Load public profile
         const docRef = doc(db, 'lawyer_profiles', user.uid);
@@ -79,56 +94,91 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
           handleFirestoreError(e, OperationType.GET, `lawyer_profiles/${user.uid}`);
         }
         
-        // Load registration info
-        const regRef = doc(db, 'lawyers', user.uid);
-        let regSnap;
+        // Load payment settings
         try {
-          regSnap = await getDoc(regRef);
-        } catch (e) {
-          handleFirestoreError(e, OperationType.GET, `lawyers/${user.uid}`);
-        }
-
-        // Load subscription
-        const subRef = doc(db, 'subscriptions', user.uid);
-        let subSnap;
-        try {
-          subSnap = await getDoc(subRef);
-          if (subSnap.exists()) {
-            setCurrentSubscription(subSnap.data());
+          const payRef = doc(db, 'app_settings', 'payment');
+          const paySnap = await getDoc(payRef);
+          if (paySnap.exists()) {
+            setPaymentSettings(paySnap.data());
           }
         } catch (e) {
-          // It's okay if subscription doesn't exist, but we should handle permission errors
-          if (e instanceof Error && e.message.includes('permission')) {
-            handleFirestoreError(e, OperationType.GET, `subscriptions/${user.uid}`);
-          }
+          console.error("Error loading payment settings:", e);
         }
 
-        let combinedProfile = { ...profile };
-
-        if (docSnap.exists()) {
-          combinedProfile = { ...combinedProfile, ...docSnap.data() };
+        if (docSnap && docSnap.exists()) {
+          setProfile(prev => ({ ...prev, ...docSnap.data() }));
         }
-        
-        if (regSnap.exists()) {
-          const regData = regSnap.data();
-          setStatus(regData.status || 'pending');
-          combinedProfile = { 
-            ...combinedProfile, 
-            regNumber: regData.regNumber || '',
-            location: regData.location || '',
-            reviewPrice: regData.reviewPrice || 50000,
-            settlementCycle: regData.settlementCycle || '주간 (월-일 집계 후 익주 금요일 입금)'
-          };
-        }
-
-        setProfile(combinedProfile as LawyerProfile);
       } catch (error) {
         console.error("Error loading lawyer profile:", error);
       } finally {
         setIsLoading(false);
       }
     }
+    // Real-time listener for ad payment requests
+    const qAd = query(
+      collection(db, 'ad_payment_requests'),
+      where('lawyerId', '==', user.uid)
+    );
+
+    unsubscribeAd = onSnapshot(qAd, (snapshot) => {
+      if (!snapshot.empty) {
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort by createdAt desc in memory to avoid index requirement
+        docs.sort((a: any, b: any) => {
+          const tA = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
+          const tB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+          return tB - tA;
+        });
+        setPendingRequest(docs[0]);
+      } else {
+        setPendingRequest(null);
+      }
+    }, (error) => {
+      console.error("Error listening to ad requests:", error);
+    });
+
+    // Real-time listener for subscription
+    const subRef = doc(db, 'subscriptions', user.uid);
+    const unsubscribeSub = onSnapshot(subRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setCurrentSubscription(docSnap.data());
+      } else {
+        setCurrentSubscription(null);
+      }
+    }, (error) => {
+      if (error.message.includes('permission')) {
+        handleFirestoreError(error, OperationType.GET, `subscriptions/${user.uid}`);
+      }
+    });
+
+    // Real-time listener for lawyer status
+    const regRef = doc(db, 'lawyers', user.uid);
+    const unsubscribeReg = onSnapshot(regRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const regData = docSnap.data();
+        setStatus(regData.status || 'pending');
+        setProfile(prev => ({
+          ...prev,
+          regNumber: regData.regNumber || prev.regNumber,
+          location: regData.location || prev.location,
+          reviewPrice: regData.reviewPrice || prev.reviewPrice,
+          settlementCycle: regData.settlementCycle || prev.settlementCycle,
+          adStatus: regData.adStatus || prev.adStatus,
+          adPlan: regData.adPlan || prev.adPlan,
+          adExpiryDate: regData.adExpiryDate || prev.adExpiryDate
+        }));
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `lawyers/${user.uid}`);
+    });
+
     loadProfile();
+
+    return () => {
+      if (unsubscribeAd) unsubscribeAd();
+      unsubscribeSub();
+      unsubscribeReg();
+    };
   }, [user]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,60 +234,97 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
     reader.readAsDataURL(file);
   };
 
-  const handleRequestBillingKey = (plan: 'basic' | 'standard' | 'premium', amount: number) => {
-    if (!window.IMP) {
-      setErrorMsg('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
+  const handleRequestBillingKey = async (plan: 'basic' | 'partnership', amount: number) => {
+    if (!paymentSettings?.clientKey) {
+      setErrorMsg('결제 설정이 완료되지 않았습니다. 관리자에게 문의해 주세요.');
       return;
     }
     
-    const { IMP } = window;
-    // Note: This is a test merchant ID. In production, use your real PortOne ID.
-    IMP.init('imp00000000'); 
+    try {
+      setIsSubscribing(true);
+      const tossPayments = await loadTossPayments(paymentSettings.clientKey);
 
-    IMP.request_pay({
-      pg: 'html5_inicis.billing',
-      pay_method: 'card',
-      merchant_uid: `billing_${user?.uid}_${Date.now()}`,
-      name: `SoloLaw 변호사 정액제 광고 (${plan.toUpperCase()})`,
-      amount: 0, // Billing key issuance is 0 won
-      customer_uid: `lawyer_${user?.uid}`, // Unique ID for this lawyer's card
-    }, async (rsp: any) => {
-      if (rsp.success) {
-        try {
-          setIsSubscribing(true);
-          const response = await fetch('/api/subscriptions/billing-key', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              lawyerId: user?.uid,
-              customer_uid: rsp.customer_uid,
-              planType: plan,
-              amount: amount
-            })
-          });
-          
-          if (response.ok) {
-            setErrorMsg('정기 결제 등록이 완료되었습니다.');
-            // Reload subscription
-            const subRef = doc(db, 'subscriptions', user!.uid);
-            const subSnap = await getDoc(subRef);
-            if (subSnap.exists()) {
-              setCurrentSubscription(subSnap.data());
-            }
-          } else {
-            const errData = await response.json();
-            setErrorMsg(`서버 저장 중 오류가 발생했습니다: ${errData.error || 'Unknown error'}`);
-          }
-        } catch (error) {
-          console.error('Subscription error:', error);
-          setErrorMsg('통신 중 오류가 발생했습니다.');
-        } finally {
-          setIsSubscribing(false);
-        }
-      } else {
-        setErrorMsg(`등록 실패: ${rsp.error_msg}`);
-      }
-    });
+      // Store plan info in localStorage to retrieve after redirect
+      localStorage.setItem('pending_subscription', JSON.stringify({
+        planType: plan,
+        amount: amount,
+        lawyerId: user?.uid
+      }));
+
+      await tossPayments.requestBillingAuth('카드', {
+        customerKey: user?.uid || 'anonymous',
+        successUrl: `${window.location.origin}/payment/billing-success`,
+        failUrl: `${window.location.origin}/payment/billing-fail`,
+      });
+    } catch (error) {
+      console.error('Toss Payments error:', error);
+      setErrorMsg('결제 모듈을 불러오는 중 오류가 발생했습니다.');
+      setIsSubscribing(false);
+    }
+  };
+
+  const handleTossPayment = (plan: string, amount: number) => {
+    if (!paymentSettings || paymentSettings.active_method !== 'toss_direct') {
+      setErrorMsg('현재 직접 송금 방식이 활성화되어 있지 않습니다.');
+      return;
+    }
+
+    const account = paymentSettings.account_info?.account_number || "1000-XXXX-XXXX";
+    const bank = paymentSettings.account_info?.bank || "토스뱅크";
+    const message = `솔로로_${profile.name || user?.displayName || '변호사'}`;
+    
+    // Deep link for Toss
+    const tossUrl = `supertoss://send?bank=${bank}&account=${account}&amount=${amount}&memo=${message}`;
+    
+    if (/iPhone|Android/i.test(navigator.userAgent)) {
+      window.location.href = tossUrl;
+    } else {
+      setErrorMsg(`모바일 토스 앱에서 결제하시거나, 아래 계좌로 입금해 주세요:\n${bank} ${account}\n예금주: ${paymentSettings.account_info?.holder || '박정환'}`);
+    }
+  };
+
+  const handleNotifyDeposit = async (plan: string, amount: number) => {
+    if (!user) return;
+    setIsNotifyingDeposit(true);
+    try {
+      const docRef = await addDoc(collection(db, 'ad_payment_requests'), {
+        lawyerId: user.uid,
+        lawyerName: profile.name || user.displayName || '익명 변호사',
+        planType: plan,
+        amount: amount,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      setPendingRequest({
+        id: docRef.id,
+        planType: plan,
+        amount: amount,
+        status: 'pending',
+        createdAt: new Date()
+      });
+      setErrorMsg('입금 확인 요청이 전송되었습니다. 관리자 확인 후 광고가 활성화됩니다.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'ad_payment_requests');
+    } finally {
+      setIsNotifyingDeposit(false);
+    }
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    if (!user || !requestId) return;
+    
+    setIsSaving(true);
+    try {
+      const { deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, 'ad_payment_requests', requestId));
+      setPendingRequest(null);
+      setErrorMsg("광고 신청이 취소되었습니다.");
+    } catch (error) {
+      console.error("Cancel request failed:", error);
+      setErrorMsg("신청 취소 중 오류가 발생했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -285,12 +372,17 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
       await setDoc(doc(db, 'lawyer_profiles', user.uid), profileData);
 
       // 2. Save/Update registration for admin verification
-      // We only set status to pending if it's a new registration or if they want to re-verify
+      // We also sync display fields to the 'lawyers' collection for search and ad cards
       await setDoc(regRef, {
         name: profile.name,
         email: user.email,
         regNumber: profile.regNumber,
         location: profile.location,
+        firmName: profile.firmName,
+        experience: profile.experience,
+        photo: profile.photo,
+        firmLogo: profile.firmLogo,
+        specialties: [profile.specialty], // Sync as array for search compatibility
         reviewPrice: Number(profile.reviewPrice),
         settlementCycle: profile.settlementCycle,
         status: regSnap.exists() ? regSnap.data().status : 'pending',
@@ -769,102 +861,170 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        {/* Subscription Section */}
+        {/* Subscription & Payment Section */}
         <div className="bg-white border border-slate-200 rounded-3xl p-8 space-y-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#0F172A]">SoloLaw 파트너십 구독</h3>
+              <h3 className="text-lg font-bold text-[#0F172A]">SoloLaw 파트너십 광고 플랜</h3>
               <p className="text-xs text-slate-500">정액제 광고로 더 많은 의뢰인을 만나보세요.</p>
             </div>
+            <button 
+              onClick={() => (window as any).navigateToDemo?.()}
+              className="ml-auto flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-600 rounded-xl text-xs font-bold hover:bg-brand-100 transition-all border border-brand-100"
+            >
+              <Eye className="w-4 h-4" /> 미리보기 데모
+            </button>
           </div>
 
-          {currentSubscription ? (
+          {(currentSubscription || profile.adStatus === 'active' || pendingRequest?.status === 'approved') ? (
             <div className="bg-brand-50 border border-brand-100 p-6 rounded-2xl space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-xs text-brand-600 font-bold uppercase tracking-wider">현재 이용 중인 플랜</p>
                   <h4 className="text-xl font-bold text-brand-900">
-                    {currentSubscription.planType === 'premium' ? '프리미엄' : 
-                     currentSubscription.planType === 'standard' ? '스탠다드' : '베이직'} 플랜
+                    {(currentSubscription?.planType || profile.adPlan || pendingRequest?.planType) === 'partnership' ? '솔로로 파트너십' : '미가입'}
                   </h4>
                 </div>
                 <div className="px-3 py-1 bg-brand-600 text-white text-[10px] font-bold rounded-full">
-                  구독 중
+                  광고 중
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="bg-white/50 p-3 rounded-xl">
-                  <p className="text-[10px] text-slate-500 mb-1">다음 결제 예정일</p>
-                  <p className="text-sm font-bold text-slate-700">
-                    {currentSubscription.nextBillingDate?.toDate ? 
-                      currentSubscription.nextBillingDate.toDate().toLocaleDateString() : 
-                      new Date(currentSubscription.nextBillingDate).toLocaleDateString()}
+                  <p className="text-[10px] text-brand-600 font-bold">광고 만료일</p>
+                  <p className="text-sm font-bold text-brand-900">
+                    {(() => {
+                      const date = currentSubscription?.nextBillingDate || profile.adExpiryDate;
+                      if (!date) {
+                        // If approved but subscription doc not yet synced, calculate estimated expiry
+                        if (pendingRequest?.approvedAt) {
+                          const approvedDate = pendingRequest.approvedAt.toDate ? pendingRequest.approvedAt.toDate() : new Date(pendingRequest.approvedAt);
+                          approvedDate.setDate(approvedDate.getDate() + 30);
+                          return approvedDate.toLocaleDateString();
+                        }
+                        return '-';
+                      }
+                      return date.toDate ? date.toDate().toLocaleDateString() : new Date(date).toLocaleDateString();
+                    })()}
                   </p>
                 </div>
                 <div className="bg-white/50 p-3 rounded-xl">
-                  <p className="text-[10px] text-slate-500 mb-1">월 결제 금액</p>
-                  <p className="text-sm font-bold text-slate-700">
-                    {currentSubscription.amount.toLocaleString()}원
+                  <p className="text-[10px] text-brand-600 font-bold">결제 금액</p>
+                  <p className="text-sm font-bold text-brand-900">
+                    {(currentSubscription?.amount || pendingRequest?.amount) ? `${(currentSubscription?.amount || pendingRequest?.amount).toLocaleString()}원` : '-'}
                   </p>
                 </div>
               </div>
-
-              <p className="text-[11px] text-brand-700 flex items-center gap-1">
-                <Info className="w-3 h-3" /> 매달 자동 결제되며, 언제든 해지 가능합니다.
+            </div>
+          ) : pendingRequest?.status === 'pending' ? (
+            <div className="bg-amber-50 border border-amber-100 p-6 rounded-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs text-amber-600 font-bold uppercase tracking-wider">입금 확인 대기 중</p>
+                  <h4 className="text-xl font-bold text-amber-900">
+                    {pendingRequest.planType === 'partnership' ? '솔로로 파트너십' : '미가입'}
+                  </h4>
+                </div>
+                <div className="px-3 py-1 bg-amber-500 text-white text-[10px] font-bold rounded-full animate-pulse">
+                  확인 중
+                </div>
+              </div>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                관리자가 입금 내역을 확인하고 있습니다. 확인이 완료되면 광고가 자동으로 시작됩니다.
+                (보통 24시간 이내 완료)
               </p>
+              <div className="bg-white/50 p-3 rounded-xl">
+                <p className="text-[10px] text-amber-600 font-bold">요청 일시</p>
+                <p className="text-sm font-bold text-amber-900">
+                  {pendingRequest.createdAt?.toDate ? 
+                    pendingRequest.createdAt.toDate().toLocaleString() : 
+                    new Date(pendingRequest.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <button 
+                onClick={() => handleCancelRequest(pendingRequest.id)}
+                disabled={isSaving}
+                className="w-full py-3 bg-white border border-amber-200 text-amber-600 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all disabled:opacity-50"
+              >
+                {isSaving ? '취소 중...' : '신청 취소하기'}
+              </button>
+            </div>
+          ) : pendingRequest?.status === 'rejected' ? (
+            <div className="bg-red-50 border border-red-100 p-6 rounded-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs text-red-600 font-bold uppercase tracking-wider">입금 확인 반려됨</p>
+                  <h4 className="text-xl font-bold text-red-900">
+                    {pendingRequest.planType === 'partnership' ? '솔로로 파트너십' : '미가입'}
+                  </h4>
+                </div>
+                <div className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold rounded-full">
+                  반려
+                </div>
+              </div>
+              <div className="p-4 bg-white/80 rounded-xl border border-red-100">
+                <p className="text-[10px] text-red-800 font-bold mb-1">반려 사유</p>
+                <p className="text-xs text-red-700 leading-relaxed font-medium">
+                  {pendingRequest.rejectionReason || '입금 내역을 확인할 수 없습니다. 다시 시도해 주세요.'}
+                </p>
+              </div>
+              <button 
+                onClick={() => setPendingRequest(null)}
+                className="w-full py-3 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-bold hover:bg-red-50 transition-all"
+              >
+                다시 신청하기
+              </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { id: 'basic', name: '베이직', price: 99000, color: 'slate' },
-                { id: 'standard', name: '스탠다드', price: 199000, color: 'brand' },
-                { id: 'premium', name: '프리미엄', price: 299000, color: 'amber' }
-              ].map((plan) => (
-                <div 
-                  key={plan.id}
-                  className={`border-2 rounded-2xl p-5 space-y-4 transition-all hover:shadow-md ${
-                    plan.id === 'standard' ? 'border-brand-200 bg-brand-50/30' : 'border-slate-100'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <p className={`text-[10px] font-bold uppercase tracking-wider ${
-                      plan.id === 'premium' ? 'text-amber-600' : plan.id === 'standard' ? 'text-brand-600' : 'text-slate-500'
-                    }`}>
-                      {plan.name}
-                    </p>
-                    <p className="text-lg font-bold text-slate-900">
-                      {plan.price.toLocaleString()}원 <span className="text-xs font-normal text-slate-400">/ 월</span>
-                    </p>
-                  </div>
-                  
-                  <ul className="space-y-2">
-                    <li className="text-[11px] text-slate-600 flex items-center gap-1.5">
-                      <Check className="w-3 h-3 text-green-500" /> 리스트 상단 노출
-                    </li>
-                    <li className="text-[11px] text-slate-600 flex items-center gap-1.5">
-                      <Check className="w-3 h-3 text-green-500" /> AI 홍보 카드 제공
-                    </li>
-                  </ul>
+            <div className="space-y-8">
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-black text-slate-900">솔로로 파트너십</h3>
+                <p className="text-slate-500">변호사님의 전문성을 가장 효과적으로 전달하는 단 하나의 플랜</p>
+              </div>
+              
+              <SinglePlanCard 
+                price={paymentSettings?.ad_plans?.partnership || 99000}
+                onSubscribe={() => {
+                  if (paymentSettings?.active_method === 'toss_direct') {
+                    handleTossPayment('partnership', paymentSettings?.ad_plans?.partnership || 99000);
+                  } else {
+                    handleRequestBillingKey('partnership' as any, paymentSettings?.ad_plans?.partnership || 99000);
+                  }
+                }}
+              />
 
-                  <button
-                    onClick={() => handleRequestBillingKey(plan.id as any, plan.price)}
-                    disabled={isSubscribing}
-                    className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      plan.id === 'standard' 
-                        ? 'bg-brand-600 text-white hover:bg-brand-700' 
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
+              {paymentSettings?.active_method === 'toss_direct' && (
+                <div className="max-w-md mx-auto">
+                  <button 
+                    onClick={() => handleNotifyDeposit('partnership', paymentSettings?.ad_plans?.partnership || 99000)}
+                    disabled={isNotifyingDeposit}
+                    className="w-full py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold hover:border-brand-500 hover:text-brand-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {isSubscribing ? '처리 중...' : '구독하기'}
+                    {isNotifyingDeposit ? <Loader2 className="w-4 h-4 animate-spin" /> : '입금 완료 후 통보하기'}
                   </button>
+                  <p className="text-center text-[10px] text-slate-400 mt-3">
+                    직접 송금 후 위 버튼을 눌러주시면 관리자 확인 후 즉시 활성화됩니다.
+                  </p>
                 </div>
-              ))}
+              )}
             </div>
           )}
+          
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex gap-3">
+            <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-[11px] text-slate-600 font-bold">광고 운영 안내</p>
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                {paymentSettings?.active_method === 'toss_direct' ? 
+                  "토스 송금 후 '입금 완료 통보' 버튼을 눌러주세요. 관리자가 입금 확인 후 24시간 이내에 광고를 활성화해 드립니다." : 
+                  "정기 결제 등록 시 매월 자동으로 광고료가 결제되며, 광고가 중단 없이 유지됩니다."}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -999,7 +1159,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
             <div className="space-y-2">
               <h4 className="text-sm font-bold text-brand-300">투명한 비용</h4>
               <p className="text-xs text-brand-100/80 leading-relaxed">
-                월 <strong>99,000원</strong>의 정액 비용으로, 추가 비용 없이 귀하의 전문성을 나홀로 소송 유저들에게 알리세요.
+                월 <strong>{(paymentSettings?.ad_plans?.partnership || 99000).toLocaleString()}원</strong>의 합리적인 정액 비용으로, 추가 수수료 없이 귀하의 전문성을 나홀로 소송 유저들에게 알리세요.
               </p>
             </div>
             <div className="space-y-2">

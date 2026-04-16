@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, MessageSquare, Award, Briefcase, Star, ShieldCheck, Info, Filter, LayoutGrid, List, MapPin, Clock, CreditCard, ChevronRight, User } from 'lucide-react';
+import { Phone, MessageSquare, Award, Briefcase, Star, ShieldCheck, Info, Filter, LayoutGrid, List, MapPin, Clock, CreditCard, ChevronRight, User, Loader2 } from 'lucide-react';
 import { matchLawyersByKeywords, generateLawyerAdCard } from '../services/gemini';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface LawyerProfile {
   id: string;
@@ -21,6 +23,9 @@ interface LawyerProfile {
   bidPrice: number;
   consultationFee: string;
   hasActiveSubscription?: boolean;
+  adStatus?: string;
+  adPlan?: string;
+  priority?: number;
 }
 
 interface AdCardData {
@@ -47,7 +52,10 @@ const MOCK_LAWYERS: LawyerProfile[] = [
     distance: "1.2km",
     bidPrice: 5000,
     consultationFee: "5만원 / 30분",
-    hasActiveSubscription: true
+    hasActiveSubscription: true,
+    adStatus: 'active',
+    adPlan: 'partnership',
+    priority: 2
   },
   {
     id: "L2",
@@ -65,7 +73,10 @@ const MOCK_LAWYERS: LawyerProfile[] = [
     distance: "2.5km",
     bidPrice: 3000,
     consultationFee: "3만원 / 30분",
-    hasActiveSubscription: true
+    hasActiveSubscription: true,
+    adStatus: 'active',
+    adPlan: 'partnership',
+    priority: 1
   },
   {
     id: "L3",
@@ -82,7 +93,10 @@ const MOCK_LAWYERS: LawyerProfile[] = [
     location: "서울 송파구",
     distance: "0.8km",
     bidPrice: 4000,
-    consultationFee: "4만원 / 30분"
+    consultationFee: "4만원 / 30분",
+    adStatus: 'active',
+    adPlan: 'partnership',
+    priority: 0
   },
   {
     id: "L4",
@@ -99,7 +113,10 @@ const MOCK_LAWYERS: LawyerProfile[] = [
     location: "서울 서초구",
     distance: "1.5km",
     bidPrice: 2000,
-    consultationFee: "무료 (첫 상담)"
+    consultationFee: "무료 (첫 상담)",
+    adStatus: 'active',
+    adPlan: 'partnership',
+    priority: 0
   }
 ];
 
@@ -132,45 +149,95 @@ export default function LawyerAdCard({ caseSummary }: { caseSummary: string }) {
   useEffect(() => {
     async function performMatching() {
       setIsLoading(true);
-      const result = await matchLawyersByKeywords({
-        caseSummary,
-        lawyers: MOCK_LAWYERS,
-        userLocation: userLocation || undefined
-      });
-      
-      if (result) {
-        // Apply shuffle to lawyers with same bid price for fairness
-        const shuffledLawyers = shuffle(result.lawyers);
-        setMatchedData({ ...result, lawyers: shuffledLawyers });
+      try {
+        // 1. Fetch real lawyers from Firestore who have active ads
+        const lawyersRef = collection(db, 'lawyers');
+        const q = query(lawyersRef, where('adStatus', '==', 'active'), where('adPlan', '==', 'partnership'), limit(20));
+        const querySnapshot = await getDocs(q);
+        
+        const firestoreLawyers: LawyerProfile[] = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '익명 변호사',
+            firmName: data.firmName || '법률사무소',
+            firmLogo: data.photo || data.firmLogo || null,
+            experience: data.experience || '경력 정보 없음',
+            cases: data.cases || '다수의 승소 사례 보유',
+            specialties: data.specialties || ['민사', '형사'],
+            message: data.message || '의뢰인의 권익을 위해 최선을 다합니다.',
+            phone: data.phone || '010-0000-0000',
+            kakao: data.kakao || '',
+            rating: data.rating || 5.0,
+            reviewCount: data.reviewCount || 0,
+            location: data.location || '전국',
+            distance: '계산 중',
+            bidPrice: data.priority || 0, // Use priority as bidPrice for sorting
+            consultationFee: data.reviewPrice ? `${data.reviewPrice.toLocaleString()}원` : '별도 문의',
+            hasActiveSubscription: data.hasActiveSubscription,
+            adPlan: data.adPlan,
+            priority: data.priority || 0
+          };
+        });
 
-        // Generate ad content for each matched lawyer sequentially to avoid rate limits
-        for (const lawyer of shuffledLawyers) {
-          if (!adContent[lawyer.id]) {
-            try {
-              const content = await generateLawyerAdCard({
-                lawyerInfo: {
-                  name: lawyer.name,
-                  experience: lawyer.experience,
-                  cases: lawyer.cases,
-                  specialty: lawyer.specialties.join(', ')
-                },
-                caseType: result.category,
-                lawyerMessage: lawyer.message
-              });
-              setAdContent(prev => ({ ...prev, [lawyer.id]: content }));
-              // Small delay between calls to avoid hitting rate limits
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            } catch (error) {
-              console.error(`Failed to generate ad for lawyer ${lawyer.id}:`, error);
+        // Use mock lawyers as fallback if no real lawyers found (for demo)
+        const lawyersToMatch = firestoreLawyers.length > 0 ? firestoreLawyers : MOCK_LAWYERS;
+
+        const result = await matchLawyersByKeywords({
+          caseSummary,
+          lawyers: lawyersToMatch,
+          userLocation: userLocation || undefined
+        });
+        
+        if (result) {
+          // 2. Randomized exposure within same priority tiers
+          // Group by priority
+          const grouped = (result.lawyers as LawyerProfile[]).reduce((acc, lawyer) => {
+            const p = lawyer.priority || 0;
+            if (!acc[p]) acc[p] = [];
+            acc[p].push(lawyer);
+            return acc;
+          }, {} as Record<number, LawyerProfile[]>);
+
+          // Shuffle each group and flatten
+          const fairLawyers = Object.keys(grouped)
+            .sort((a, b) => Number(b) - Number(a)) // High priority first
+            .flatMap(p => shuffle(grouped[Number(p)]));
+
+          setMatchedData({ ...result, lawyers: fairLawyers });
+
+          // Generate ad content for matched lawyers in parallel
+          await Promise.all(fairLawyers.map(async (lawyer) => {
+            if (!adContent[lawyer.id]) {
+              try {
+                const content = await generateLawyerAdCard({
+                  lawyerInfo: {
+                    name: lawyer.name,
+                    experience: lawyer.experience,
+                    cases: lawyer.cases,
+                    specialty: lawyer.specialties.join(', ')
+                  },
+                  caseType: result.category,
+                  lawyerMessage: lawyer.message
+                });
+                if (content) {
+                  setAdContent(prev => ({ ...prev, [lawyer.id]: content }));
+                }
+              } catch (error) {
+                console.error(`Failed to generate ad for lawyer ${lawyer.id}:`, error);
+              }
             }
-          }
+          }));
         }
+      } catch (error) {
+        console.error("Error matching lawyers:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
 
     performMatching();
-  }, [caseSummary]);
+  }, [caseSummary, userLocation]);
 
   const sortedLawyers = useMemo(() => {
     if (!matchedData) return [];
@@ -247,6 +314,9 @@ export default function LawyerAdCard({ caseSummary }: { caseSummary: string }) {
             <h3 className="text-lg font-bold text-[#0F172A] font-serif">관련 분야 변호사 정보</h3>
             <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">AD</span>
           </div>
+          <p className="text-[10px] text-slate-400 font-medium">
+            * 이 영역은 광고비를 지불한 변호사의 정보가 노출되는 구역입니다.
+          </p>
           {matchedData && (
             <p className="text-xs text-slate-500">
               추출된 카테고리: <span className="font-bold text-brand-600">{matchedData.category}</span>
@@ -319,6 +389,12 @@ export default function LawyerAdCard({ caseSummary }: { caseSummary: string }) {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-[#0F172A]">{lawyer.name}</h4>
+                      {lawyer.adPlan === 'partnership' && (
+                        <div className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[9px] font-bold border border-indigo-100">
+                          <ShieldCheck className="w-3 h-3" />
+                          공식 파트너
+                        </div>
+                      )}
                       {lawyer.hasActiveSubscription && (
                         <span className="text-[9px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">파트너</span>
                       )}

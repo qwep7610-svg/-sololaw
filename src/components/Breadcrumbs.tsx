@@ -13,7 +13,7 @@ const viewNameMap: Record<string, string> = {
   history: '내 보관함',
   cost: '소송 비용 계산기',
   summarizer: '판례/문서 요약',
-  lawyer_search: '변호사 찾기',
+  lawyer_search: '변호사 검색',
   lawyer_review: '변호사 서류 검토',
   about: '회사 소개',
   customer_center: '고객 센터',

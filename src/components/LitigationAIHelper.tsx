@@ -106,7 +106,7 @@ export default function LitigationAIHelper({
                         }}
                         className="flex items-center justify-between p-3 bg-slate-50 hover:bg-brand-50 rounded-xl text-sm text-slate-700 hover:text-brand-700 transition-all group"
                       >
-                        <span>변호사에게 서류 검토 받기</span>
+                        <span>변호사 검색</span>
                         <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-brand-400" />
                       </button>
                     </div>

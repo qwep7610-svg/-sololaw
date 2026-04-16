@@ -113,6 +113,24 @@ service cloud.firestore {
     //   - createdAt: timestamp (required)
     //   - updatedAt: timestamp (required)
     //
+    // Collection: app_settings
+    // Document ID: payment
+    // Fields:
+    //   - active_method: string (toss_direct, portone)
+    //   - account_info: map
+    //   - ad_plans: map
+    //   - updatedAt: timestamp
+    //
+    // Collection: ad_payment_requests
+    // Document ID: {requestId}
+    // Fields:
+    //   - lawyerId: string (required)
+    //   - lawyerName: string
+    //   - planType: string
+    //   - amount: number
+    //   - status: string (pending, approved, rejected)
+    //   - createdAt: timestamp
+    //
     // ===============================================================
 
     // ===============================================================
@@ -129,7 +147,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && (
-        (request.auth.token.email == "qwep7610@naver.com") ||
+        (request.auth.token.email == "qwep7610@naver.com" && request.auth.token.email_verified == true) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
@@ -188,13 +206,20 @@ service cloud.firestore {
     }
 
     function isValidLawyerRegistration(data) {
-      return (data.keys().hasAll(['name', 'email', 'regNumber', 'status', 'location']) || (request.method == 'update')) &&
-             (!('email' in data) || isValidEmail(data.email)) &&
+      return (data.keys().hasAll(['name', 'email', 'regNumber', 'status', 'location']) || (request.method == 'update') || isAdmin()) &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 100)) &&
+             (!('email' in data) || (isValidEmail(data.email) && data.email.size() <= 100)) &&
+             (!('regNumber' in data) || (data.regNumber is string && data.regNumber.size() <= 50)) &&
              (!('status' in data) || data.status in ['pending', 'approved', 'rejected']) &&
-             (!('location' in data) || (data.location is string && data.location.size() > 0)) &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 200)) &&
              (!('isExpert' in data) || data.isExpert is bool) &&
              (!('reviewPrice' in data) || data.reviewPrice is number) &&
-             (!('settlementCycle' in data) || data.settlementCycle is string);
+             (!('settlementCycle' in data) || (data.settlementCycle is string && data.settlementCycle.size() <= 20)) &&
+             (!('adStatus' in data) || data.adStatus in ['active', 'inactive']) &&
+             (!('adPlan' in data) || data.adPlan is string) &&
+             (!('adExpiryDate' in data) || data.adExpiryDate is timestamp) &&
+             (!('priority' in data) || data.priority is number) &&
+             (!('hasActiveSubscription' in data) || data.hasActiveSubscription is bool);
     }
 
     function isValidAdminLog(data) {
@@ -204,41 +229,53 @@ service cloud.firestore {
     }
 
     function isValidReviewRequest(data) {
-      return data.keys().hasAll(['userId', 'userDisplayName', 'status', 'userDraft', 'createdAt', 'updatedAt', 'paymentAmount']) &&
-             data.userId is string &&
-             data.userDisplayName is string &&
-             data.status in ['pending', 'assigned', 'reviewing', 'completed'] &&
-             data.userDraft is string && data.userDraft.size() <= 100000 &&
-             data.paymentAmount is number &&
-             (!('pgFee' in data) || data.pgFee is number) &&
-             (!('platformFee' in data) || data.platformFee is number) &&
-             (!('settlementAmount' in data) || data.settlementAmount is number) &&
-             (!('settlementStatus' in data) || data.settlementStatus in ['pending', 'completed']) &&
-             (!('lawyerId' in data) || data.lawyerId == null || data.lawyerId is string) &&
-             (!('lawyerDisplayName' in data) || data.lawyerDisplayName == null || data.lawyerDisplayName is string) &&
-             (!('lawyerNotes' in data) || data.lawyerNotes is string) &&
-             (!('report' in data) || data.report is string) &&
-             data.createdAt is timestamp &&
-             data.updatedAt is timestamp;
+      return (data.keys().hasAll(['userId', 'userDisplayName', 'status', 'userDraft', 'createdAt', 'updatedAt', 'paymentAmount']) || request.method == 'update') &&
+             (!('userId' in data) || data.userId is string) &&
+             (!('status' in data) || data.status in ['pending', 'assigned', 'reviewing', 'completed']) &&
+             (!('userDraft' in data) || (data.userDraft is string && data.userDraft.size() <= 100000)) &&
+             (!('paymentAmount' in data) || data.paymentAmount is number) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
     function isValidSettlement(data) {
-      return data.keys().hasAll(['lawyerId', 'totalAmount', 'platformFeeTotal', 'netAmount', 'status', 'createdAt']) &&
-             data.lawyerId is string &&
-             data.totalAmount is number &&
-             data.platformFeeTotal is number &&
-             data.netAmount is number &&
-             data.status in ['pending', 'completed', 'refunded'] &&
-             data.createdAt is timestamp;
+      return (data.keys().hasAll(['lawyerId', 'totalAmount', 'platformFeeTotal', 'netAmount', 'status', 'createdAt']) || request.method == 'update') &&
+             (!('lawyerId' in data) || data.lawyerId is string) &&
+             (!('totalAmount' in data) || data.totalAmount is number) &&
+             (!('status' in data) || data.status in ['pending', 'completed', 'refunded']) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     function isValidSubscription(data) {
-      return data.keys().hasAll(['lawyerId', 'billingKey', 'planType', 'amount', 'nextBillingDate', 'status']) &&
-             data.lawyerId == request.auth.uid &&
-             data.planType in ['basic', 'standard', 'premium'] &&
-             data.amount is number &&
-             data.nextBillingDate is timestamp &&
-             data.status in ['active', 'inactive', 'failed'];
+      return (data.keys().hasAll(['lawyerId', 'planType', 'amount', 'nextBillingDate', 'status']) || request.method == 'update') &&
+             (!('lawyerId' in data) || data.lawyerId is string) &&
+             (!('billingKey' in data) || data.billingKey is string) &&
+             (!('planType' in data) || data.planType in ['basic', 'standard', 'premium', 'partnership']) &&
+             (!('amount' in data) || data.amount is number) &&
+             (!('nextBillingDate' in data) || data.nextBillingDate is timestamp) &&
+             (!('status' in data) || data.status in ['active', 'inactive', 'failed']) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidPaymentSettings(data) {
+      return (data.keys().hasAll(['active_method', 'account_info', 'ad_plans']) || request.method == 'update') &&
+             (!('active_method' in data) || data.active_method in ['tosspayments', 'toss_direct', 'portone']) &&
+             (!('account_info' in data) || data.account_info is map) &&
+             (!('ad_plans' in data) || data.ad_plans is map);
+    }
+
+    function isValidAdPaymentRequest(data) {
+      return (data.keys().hasAll(['lawyerId', 'lawyerName', 'planType', 'amount', 'status', 'createdAt']) || request.method == 'update') &&
+             (!('lawyerId' in data) || data.lawyerId is string) &&
+             (!('lawyerName' in data) || (data.lawyerName is string && data.lawyerName.size() <= 100)) &&
+             (!('planType' in data) || (data.planType is string && data.planType.size() <= 50)) &&
+             (!('status' in data) || data.status in ['pending', 'approved', 'rejected']) &&
+             (!('amount' in data) || data.amount is number) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('approvedAt' in data) || data.approvedAt is timestamp) &&
+             (!('rejectionReason' in data) || data.rejectionReason is string) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
     function isValidBranding(data) {
@@ -278,13 +315,22 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
-    match /app_settings/branding {
+    match /app_settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidBranding(request.resource.data);
+      allow write: if isAdmin();
+    }
+
+    match /ad_payment_requests/{requestId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.lawyerId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidAdPaymentRequest(request.resource.data) && 
+                      request.resource.data.lawyerId == request.auth.uid &&
+                      request.resource.data.status == 'pending';
+      allow update: if isAdmin() && isValidAdPaymentRequest(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid && resource.data.status == 'pending');
     }
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || (isAuthenticated() && request.auth.token.email == "qwep7610@naver.com" && request.auth.token.email_verified == true);
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
       allow update: if (isOwner(userId) && isValidUser(request.resource.data)) ||
                       (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'isExpert']));
@@ -313,8 +359,8 @@ service cloud.firestore {
 
     match /lawyers/{lawyerId} {
       allow read: if isOwner(lawyerId) || isAdmin() || (resource != null && resource.data.status == 'approved');
-      allow create: if isOwner(lawyerId) && isValidLawyerRegistration(request.resource.data) && 
-                      request.resource.data.status == 'pending';
+      allow create: if (isOwner(lawyerId) && isValidLawyerRegistration(request.resource.data) && 
+                      request.resource.data.status == 'pending') || isAdmin();
       allow update: if (isAdmin() && isValidLawyerRegistration(request.resource.data)) ||
                       (isOwner(lawyerId) && isValidLawyerRegistration(request.resource.data) && 
                        request.resource.data.status == resource.data.status);
@@ -375,7 +421,7 @@ service cloud.firestore {
 
     match /subscriptions/{subscriptionId} {
       allow read: if isOwner(subscriptionId) || isAdmin() || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid);
-      allow create: if isLawyer() && isValidSubscription(request.resource.data);
+      allow create: if (isLawyer() || isAdmin()) && isValidSubscription(request.resource.data);
       allow update: if isAdmin() || (isOwner(subscriptionId) && isValidSubscription(request.resource.data)) || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid && isValidSubscription(request.resource.data));
       allow delete: if isAdmin();
     }

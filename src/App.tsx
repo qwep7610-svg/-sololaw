@@ -33,6 +33,8 @@ const SubscriptionManager = lazy(() => import('./components/SubscriptionManager'
 const LitigationTypeFinder = lazy(() => import('./components/LitigationTypeFinder'));
 const AboutUs = lazy(() => import('./components/AboutUs'));
 const Onboarding = lazy(() => import('./components/Onboarding'));
+const PaymentResult = lazy(() => import('./components/PaymentResult'));
+const AdPreviewDemo = lazy(() => import('./components/AdPreviewDemo'));
 
 export default function App() {
   const { view, navigateTo } = useNavigation('home');
@@ -128,6 +130,16 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    // Handle Toss Payments redirects
+    const path = window.location.pathname;
+    if (path === '/payment/billing-success') {
+      navigateTo('payment_success', true);
+    } else if (path === '/payment/billing-fail') {
+      navigateTo('payment_fail', true);
+    }
+  }, [navigateTo]);
+
   const handleOnboardingClose = () => {
     localStorage.setItem('SOLOLAW_ONBOARDING_SEEN', 'true');
     setShowOnboarding(false);
@@ -140,6 +152,13 @@ export default function App() {
 
   const memoizedBranding = useMemo(() => branding, [branding]);
   const memoizedUser = useMemo(() => user, [user]);
+
+  useEffect(() => {
+    (window as any).navigateToDemo = () => navigateTo('ad_preview_demo');
+    return () => {
+      delete (window as any).navigateToDemo;
+    };
+  }, [navigateTo]);
 
   const renderMainContent = () => {
     const isAdmin = memoizedUser?.role === 'admin' && isAdminPreview;
@@ -358,7 +377,7 @@ export default function App() {
 
           <div className="max-w-4xl mx-auto w-full">
             <LitigationManager 
-              onExpertConsult={() => navigateTo('lawyer_review')} 
+              onExpertConsult={() => navigateTo('lawyer_search')} 
               onStartComplaint={() => navigateTo('complaint')}
             />
           </div>
@@ -441,7 +460,7 @@ export default function App() {
                 {(visibility['lawyer_search'] !== false || isAdmin) && (
                   <FeatureCard 
                     icon={<MapPin className="w-8 h-8 text-emerald-600" />}
-                    title="내 지역 변호사 찾기"
+                    title="내 지역 변호사 검색"
                     description="현재 위치나 관할 법원 근처에서 활동 중인 전문 변호사를 직접 검색하고 상담을 신청하세요."
                     onClick={() => navigateTo('lawyer_search')}
                     color="bg-emerald-50"
@@ -736,10 +755,13 @@ export default function App() {
     }
     if (view === 'correction') return <ProtectedRoute onNavigate={navigateTo}><CorrectionGuard onBack={() => navigateTo('home')} onConsultLawyer={() => navigateTo('lawyer_review')} /></ProtectedRoute>;
     if (view === 'exhibit') return <ProtectedRoute onNavigate={navigateTo}><AutoExhibit onBack={() => navigateTo('home')} /></ProtectedRoute>;
-    if (view === 'customer_center') return <CustomerCenter onBack={() => navigateTo('home')} />;
+    if (view === 'customer_center') return <CustomerCenter onBack={() => navigateTo('home')} onNavigate={navigateTo} />;
     if (view === 'about') return <AboutUs onBack={() => navigateTo('home')} onNavigate={navigateTo} />;
     if (view === 'security') return <ProtectedRoute onNavigate={navigateTo}><SecuritySettings onBack={() => navigateTo('home')} /></ProtectedRoute>;
     if (view === 'admin') return <ProtectedRoute requiredRole="admin" onNavigate={navigateTo}><AdminDashboard /></ProtectedRoute>;
+    if (view === 'payment_success') return <PaymentResult type="success" onNavigate={navigateTo} />;
+    if (view === 'payment_fail') return <PaymentResult type="fail" onNavigate={navigateTo} />;
+    if (view === 'ad_preview_demo') return <AdPreviewDemo onBack={() => navigateTo('home')} />;
 
     return null;
   };
@@ -773,7 +795,7 @@ export default function App() {
                 className={`text-sm font-medium transition-colors flex items-center gap-1.5 ${view === 'lawyer_search' ? 'text-brand-600' : 'text-[#64748B] hover:text-[#0F172A]'}`}
                 aria-current={view === 'lawyer_search' ? 'page' : undefined}
               >
-                <MapPin className="w-4 h-4" /> 변호사 찾기
+                <MapPin className="w-4 h-4" /> 변호사 검색
               </button>
               <button 
                 onClick={() => navigateTo('history')}
@@ -781,6 +803,12 @@ export default function App() {
                 aria-current={view === 'history' ? 'page' : undefined}
               >
                 <History className="w-4 h-4" /> 내 보관함
+              </button>
+              <button 
+                onClick={() => navigateTo('ad_preview_demo')}
+                className={`text-sm font-bold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition-all flex items-center gap-1.5 ${view === 'ad_preview_demo' ? 'ring-2 ring-brand-600' : ''}`}
+              >
+                <Eye className="w-4 h-4" /> 광고 미리보기
               </button>
             </nav>
 
@@ -957,7 +985,7 @@ export default function App() {
                   onClick={() => navigateTo('lawyer_search')}
                   className={`flex items-center gap-3 p-3 rounded-xl text-sm font-medium transition-colors ${view === 'lawyer_search' ? 'bg-blue-50 text-[#2563EB]' : 'text-[#64748B] hover:bg-slate-50'}`}
                 >
-                  <MapPin className="w-4 h-4" /> 변호사 찾기
+                  <MapPin className="w-4 h-4" /> 변호사 검색
                 </button>
                 <button 
                   onClick={() => navigateTo('history')}

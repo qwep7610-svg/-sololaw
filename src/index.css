@@ -16,6 +16,17 @@
   --color-brand-800: #1e40af;
   --color-brand-900: #1e3a8a;
   --color-brand-950: #172554;
+
+  @keyframes bounce-subtle {
+    0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+    50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+  }
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+  }
+  --animate-bounce-subtle: bounce-subtle 2s infinite;
+  --animate-pulse-subtle: pulse-subtle 3s infinite;
 }
 
 @layer base {

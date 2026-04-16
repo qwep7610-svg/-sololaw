@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Mail, Phone, MessageSquare, Clock, ShieldAlert, Loader2, Scale } from 'lucide-react';
 import { db, doc, getDoc } from '../lib/firebase';
 
-export default function CustomerCenter({ onBack }: { onBack: () => void }) {
+export default function CustomerCenter({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (view: any) => void }) {
   const [legalNotice, setLegalNotice] = useState('');
   const [config, setConfig] = useState({
     email: 'support@sololaw.com',
@@ -151,8 +151,11 @@ export default function CustomerCenter({ onBack }: { onBack: () => void }) {
             <p className="text-brand-100 text-sm leading-relaxed">
               AI가 작성한 서류를 바탕으로 전문 변호사에게 직접 상담을 받아보실 수 있습니다.
             </p>
-            <button className="w-full py-3 bg-white text-brand-600 rounded-xl font-bold hover:bg-brand-50 transition-colors shadow-lg">
-              변호사 추천 받기
+            <button 
+              onClick={() => onNavigate?.('lawyer_search')}
+              className="w-full py-3 bg-white text-brand-600 rounded-xl font-bold hover:bg-brand-50 transition-colors shadow-lg"
+            >
+              변호사 검색
             </button>
           </div>
 

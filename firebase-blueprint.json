@@ -236,6 +236,44 @@
         "updatedBy": { "type": "string" }
       }
     },
+    "payment_settings": {
+      "title": "Payment Settings",
+      "description": "Configuration for Toss Direct and other payment methods",
+      "type": "object",
+      "properties": {
+        "active_method": { "type": "string", "enum": ["toss_direct", "portone"] },
+        "account_info": {
+          "type": "object",
+          "properties": {
+            "bank": { "type": "string" },
+            "account_number": { "type": "string" },
+            "holder": { "type": "string" }
+          }
+        },
+        "deep_link_url": { "type": "string" },
+        "ad_plans": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ad_payment_request": {
+      "title": "Ad Payment Request",
+      "description": "Manual deposit notification from lawyers for ad payments",
+      "type": "object",
+      "properties": {
+        "lawyerId": { "type": "string" },
+        "lawyerName": { "type": "string" },
+        "planType": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["lawyerId", "planType", "amount", "status", "createdAt"]
+    },
     "content": {
       "title": "Content",
       "description": "Legal guides, notices, and FAQ data",
@@ -312,6 +350,14 @@
     "/app_settings/branding": {
       "schema": "app_settings",
       "description": "Global branding and CMS settings"
+    },
+    "/app_settings/payment": {
+      "schema": "payment_settings",
+      "description": "Payment configuration settings"
+    },
+    "/ad_payment_requests/{requestId}": {
+      "schema": "ad_payment_request",
+      "description": "Manual deposit notifications for ad payments"
     },
     "/contents/{contentId}": {
       "schema": "content",

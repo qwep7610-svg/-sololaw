@@ -23,6 +23,9 @@ interface Lawyer {
   lastActiveAt?: any;
   profileImageUrl?: string;
   hasActiveSubscription?: boolean;
+  adStatus?: string;
+  adPlan?: string;
+  priority?: number;
 }
 
 const CATEGORIES = [
@@ -37,6 +40,7 @@ import { Logo } from './Logo';
 
 export default function LawyerSearch({ onBack }: { onBack: () => void }) {
   const { user } = useAuth();
+  const [allLawyers, setAllLawyers] = useState<Lawyer[]>([]);
   const [lawyers, setLawyers] = useState<Lawyer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('전체');
@@ -59,67 +63,13 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
       setIsLoading(true);
       try {
         const lawyersRef = collection(db, 'lawyers');
-        const q = query(lawyersRef, where('status', '==', 'approved'), limit(50));
+        const q = query(lawyersRef, where('status', '==', 'approved'), limit(100));
         const querySnapshot = await getDocs(q);
         const fetchedLawyers: Lawyer[] = [];
         querySnapshot.forEach((doc) => {
           fetchedLawyers.push({ id: doc.id, ...doc.data() } as Lawyer);
         });
-
-        // Filtering logic
-        let filtered = fetchedLawyers.filter(lawyer => {
-          const categoryMatch = selectedCategory === '전체' || lawyer.specialties.some(s => s.includes(selectedCategory));
-          // If a region is selected (not '전국'), we still show all approved lawyers but will sort the ones in the region to the top.
-          // However, if the user explicitly searches for a region, we should probably filter by it if it's a strict filter.
-          // The current logic is a strict filter for regionMatch. Let's keep it as a strict filter but ensure it's flexible.
-          const regionMatch = selectedRegion === '전국' || lawyer.location.includes(selectedRegion);
-          
-          const queryMatch = !searchQuery || 
-                             lawyer.name.includes(searchQuery) || 
-                             lawyer.firm.includes(searchQuery) || 
-                             lawyer.specialties.some(s => s.includes(searchQuery)) ||
-                             lawyer.location.includes(searchQuery);
-          return categoryMatch && regionMatch && queryMatch;
-        });
-
-        // Sorting: Region Priority -> Subscription -> Paid -> Rating
-        filtered.sort((a, b) => {
-          // 1. Region Priority (if a specific region is selected)
-          if (selectedRegion !== '전국') {
-            const aInRegion = a.location.includes(selectedRegion) ? 1 : 0;
-            const bInRegion = b.location.includes(selectedRegion) ? 1 : 0;
-            if (aInRegion !== bInRegion) return bInRegion - aInRegion;
-          }
-
-          // 2. Subscription Status
-          const aSub = a.hasActiveSubscription ? 1 : 0;
-          const bSub = b.hasActiveSubscription ? 1 : 0;
-          if (aSub !== bSub) return bSub - aSub;
-
-          // 3. Paid Ad Status
-          const aPaid = a.isPaidAd ? 1 : 0;
-          const bPaid = b.isPaidAd ? 1 : 0;
-          if (aPaid !== bPaid) return bPaid - aPaid;
-
-          // 4. Rating
-          return b.rating - a.rating;
-        });
-
-        setLawyers(filtered);
-
-        // AI Recommendation for the search
-        if (selectedCategory !== '전체' || selectedRegion !== '전국') {
-          const rec = await generateMatchingRecommendation({
-            userNickname: user?.displayName || '사용자',
-            primaryCategory: selectedCategory === '전체' ? '다양한' : selectedCategory,
-            keywords: [selectedCategory, searchQuery].filter(Boolean),
-            userLocation: selectedRegion === '전국' ? undefined : selectedRegion
-          });
-          setRecommendationText(rec);
-        } else {
-          setRecommendationText('SoloLaw 파트너 변호사들은 대한변호사협회 인증을 거친 신뢰할 수 있는 전문가들입니다.');
-        }
-
+        setAllLawyers(fetchedLawyers);
       } catch (error) {
         console.error("Error fetching lawyers:", error);
       } finally {
@@ -128,7 +78,80 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
     };
 
     fetchLawyers();
-  }, [selectedCategory, selectedRegion, searchQuery, user]);
+  }, []);
+
+  useEffect(() => {
+    // Filtering logic
+    let filtered = allLawyers.filter(lawyer => {
+      const categoryMatch = selectedCategory === '전체' || lawyer.specialties.some(s => s.includes(selectedCategory));
+      const regionMatch = selectedRegion === '전국' || lawyer.location.includes(selectedRegion);
+      
+      const queryMatch = !searchQuery || 
+                         lawyer.name.includes(searchQuery) || 
+                         lawyer.firm.includes(searchQuery) || 
+                         lawyer.specialties.some(s => s.includes(searchQuery)) ||
+                         lawyer.location.includes(searchQuery);
+      return categoryMatch && regionMatch && queryMatch;
+    });
+
+    // Sorting: Priority -> Subscription -> Rating
+    filtered.sort((a, b) => {
+      // Only apply priority/subscription sorting if adStatus is active
+      const isAActive = a.adStatus === 'active';
+      const isBActive = b.adStatus === 'active';
+
+      // 1. Priority (Ad Plan)
+      const priorityA = isAActive ? (a.priority || 0) : 0;
+      const priorityB = isBActive ? (b.priority || 0) : 0;
+      if (priorityA !== priorityB) return priorityB - priorityA;
+
+      // 2. Subscription Status
+      const aSub = (isAActive && a.hasActiveSubscription) ? 1 : 0;
+      const bSub = (isBActive && b.hasActiveSubscription) ? 1 : 0;
+      if (aSub !== bSub) return bSub - aSub;
+
+      // 3. Rating
+      return b.rating - a.rating;
+    });
+
+    // Randomized exposure within same priority tiers for fairness
+    const grouped = filtered.reduce((acc, lawyer) => {
+      const p = lawyer.priority || 0;
+      if (!acc[p]) acc[p] = [];
+      acc[p].push(lawyer);
+      return acc;
+    }, {} as Record<number, Lawyer[]>);
+
+    const fairLawyers = Object.keys(grouped)
+      .sort((a, b) => Number(b) - Number(a))
+      .flatMap(p => {
+        const arr = grouped[Number(p)];
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      });
+
+    setLawyers(fairLawyers);
+
+    const fetchRecommendation = async () => {
+      // AI Recommendation for the search
+      if (selectedCategory !== '전체' || selectedRegion !== '전국') {
+        const rec = await generateMatchingRecommendation({
+          userNickname: user?.displayName || '사용자',
+          primaryCategory: selectedCategory === '전체' ? '다양한' : selectedCategory,
+          keywords: [selectedCategory, searchQuery].filter(Boolean),
+          userLocation: selectedRegion === '전국' ? undefined : selectedRegion
+        });
+        setRecommendationText(rec);
+      } else {
+        setRecommendationText('SoloLaw 파트너 변호사들은 대한변호사협회 인증을 거친 신뢰할 수 있는 전문가들입니다.');
+      }
+    };
+
+    fetchRecommendation();
+  }, [allLawyers, selectedCategory, selectedRegion, searchQuery, user]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
@@ -246,7 +269,7 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
                   lawyer.hasActiveSubscription ? 'border-brand-100 bg-brand-50/10' : 'border-slate-200'
                 }`}
               >
-                {lawyer.hasActiveSubscription && (
+                {lawyer.adStatus === 'active' && lawyer.hasActiveSubscription && (
                   <div className="absolute top-6 right-6 flex items-center gap-1.5 bg-brand-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
                     <ShieldCheck className="w-3 h-3" /> 파트너
                   </div>
@@ -266,6 +289,11 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
                         </div>
                       )}
                     </div>
+                    {lawyer.adPlan === 'partnership' && (
+                      <div className="absolute -top-2 -left-2 bg-indigo-600 text-white p-1.5 rounded-xl shadow-lg border-2 border-white z-10" title="솔로로 공식 파트너">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                    )}
                     {lawyer.rating >= 4.8 && (
                       <div className="absolute -bottom-2 -right-2 bg-amber-400 text-white p-1.5 rounded-xl shadow-md">
                         <Star className="w-4 h-4 fill-current" />

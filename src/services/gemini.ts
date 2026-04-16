@@ -23,24 +23,21 @@ async function withRetry<T>(
   let currentModel = modelName;
   
   // Map to standard model aliases supported by the platform
-  if (currentModel.includes("gemini-1.5-pro")) {
-    currentModel = "gemini-3.1-pro-preview";
-  } else if (currentModel.includes("gemini-1.5-flash-8b")) {
-    currentModel = "gemini-3.1-flash-lite-preview";
+  if (currentModel.includes("gemini-1.5-pro") || currentModel.includes("gemini-3.1-pro")) {
+    currentModel = "gemini-1.5-pro";
+  } else if (currentModel.includes("gemini-1.5-flash-8b") || currentModel.includes("gemini-3.1-flash-lite")) {
+    currentModel = "gemini-1.5-flash";
   } else if (currentModel.includes("gemini-1.5-flash") || currentModel.includes("gemini-3")) {
-    currentModel = "gemini-3-flash-preview";
+    currentModel = "gemini-1.5-flash";
   }
 
   for (let i = 0; i < maxRetries; i++) {
     try {
       // Fallback logic to bypass potential rate limits
       if (i >= 4) {
-        if (currentModel === "gemini-3.1-pro-preview") {
-          currentModel = "gemini-3-flash-preview";
+        if (currentModel === "gemini-1.5-pro") {
+          currentModel = "gemini-1.5-flash";
           console.warn(`Switching to fallback model: ${currentModel} (from Pro) due to persistent rate limits.`);
-        } else if (i >= 7 && currentModel === "gemini-3-flash-preview") {
-          currentModel = "gemini-3.1-flash-lite-preview";
-          console.warn(`Switching to fallback model: ${currentModel} (from Flash) due to persistent rate limits.`);
         }
       }
 
@@ -137,7 +134,7 @@ export async function generateComplaint(data: {
 마지막에 '### 💡 SoloLaw 소송 팁' 섹션을 추가하여 해당 소송에서 유의할 점을 조언하세요.
 `;
 
-  const response = await safeGenerate("gemini-3-flash-preview", {
+  const response = await safeGenerate("gemini-1.5-flash", {
     contents: prompt,
   });
 
@@ -1073,6 +1070,8 @@ export async function matchLawyersByKeywords(data: {
     rating: number;
     consultationFee: string;
     hasActiveSubscription?: boolean;
+    adPlan?: string;
+    priority?: number;
   }[];
   userLocation?: string;
 }) {
@@ -1190,7 +1189,7 @@ JSON 형식으로 출력하세요. (마크다운 코드 블록 없이 순수 JSO
 }
 `;
 
-  const response = await safeGenerate("gemini-3-flash-preview", {
+  const response = await safeGenerate("gemini-1.5-flash", {
     contents: prompt,
   }, cacheKey);
 

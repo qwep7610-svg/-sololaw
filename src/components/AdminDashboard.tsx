@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShieldCheck, 
@@ -29,7 +29,8 @@ import {
   Plus,
   Palette,
   Settings2,
-  Wallet
+  Wallet,
+  Loader2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -45,8 +46,9 @@ import {
   LineChart,
   Line
 } from 'recharts';
-import { db, collection, query, where, onSnapshot, updateDoc, setDoc, doc, addDoc, serverTimestamp, orderBy, deleteDoc, getDoc, handleFirestoreError, OperationType, writeBatch } from '../lib/firebase';
+import { db, collection, query, where, onSnapshot, updateDoc, setDoc, doc, addDoc, serverTimestamp, orderBy, deleteDoc, getDoc, handleFirestoreError, OperationType, writeBatch, getDocs } from '../lib/firebase';
 import { verifyLawyerCredentials, generateSecurityGuideline, manageAdInventory, generateSettlementReport } from '../services/gemini';
+import AdPreview from './AdPreview';
 import { useAuth } from '../lib/AuthContext';
 import PolicyEditor from './PolicyEditor';
 import BrandingSettings from './BrandingSettings';
@@ -81,7 +83,7 @@ const AdminFeatureManager = ({ branding }: { branding: any }) => {
     { id: 'demand_letter', name: '내용증명 생성' },
     { id: 'admin_appeal', name: '행정심판 청구' },
     { id: 'divorce', name: '이혼 소송 지원' },
-    { id: 'lawyer_search', name: '변호사 찾기' },
+    { id: 'lawyer_search', name: '변호사 검색' },
     { id: 'lawyer_review', name: '변호사 서류 검토' },
     { id: 'cost_calculator', name: '소송 비용 계산기' },
     { id: 'summarizer', name: '판례/문서 요약' },
@@ -96,7 +98,7 @@ const AdminFeatureManager = ({ branding }: { branding: any }) => {
     <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
       <div className="flex items-center gap-2 mb-6 text-slate-800">
         <Settings2 className="w-5 h-5 text-brand-600" />
-        <h3 className="font-bold text-lg">서비스 기능 노출 관리</h3>
+        <h3 className="font-bold text-lg">서비스 메뉴 및 기능 활성화 제어</h3>
       </div>
 
       <div className="mb-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
@@ -158,10 +160,37 @@ export default function AdminDashboard() {
   const [reasonInput, setReasonInput] = useState('');
   const [verificationStep, setVerificationStep] = useState<{ lawyerId: string, step: 1 | 2 | 3 } | null>(null);
   const [rejectionModal, setRejectionModal] = useState<{ show: boolean, lawyer: any } | null>(null);
+  const [adRejectionModal, setAdRejectionModal] = useState<{ show: boolean, request: any } | null>(null);
   const [customRejectionReason, setCustomRejectionReason] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [genericConfirm, setGenericConfirm] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    type?: 'danger' | 'info';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
   const [branding, setBranding] = useState<any>(null);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [adPaymentRequests, setAdPaymentRequests] = useState<any[]>([]);
+  const [paymentSettings, setPaymentSettings] = useState<any>(null);
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
+  const [editPayForm, setEditPayForm] = useState<any>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [previewModal, setPreviewModal] = useState<{ show: boolean, lawyer: any, planType: string } | null>(null);
+  const [subEditModal, setSubEditModal] = useState<{ show: boolean, sub: any | null }>({ show: false, sub: null });
+  const [subEditForm, setSubEditForm] = useState({
+    planType: '',
+    amount: 0,
+    status: ''
+  });
 
   // Stats data (mock for now, in real app would come from Firestore aggregations)
   const caseStats = [
@@ -252,6 +281,24 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.LIST, 'subscriptions');
     });
 
+    // Fetch ad payment requests
+    const adPayQuery = query(collection(db, 'ad_payment_requests'), orderBy('createdAt', 'desc'));
+    const unsubscribeAdPay = onSnapshot(adPayQuery, (snapshot) => {
+      setAdPaymentRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'ad_payment_requests');
+    });
+
+    // Fetch payment settings
+    const payRef = doc(db, 'app_settings', 'payment');
+    const unsubscribePaySettings = onSnapshot(payRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setPaymentSettings(docSnap.data());
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'app_settings/payment');
+    });
+
     return () => {
       unsubscribeLawyers();
       unsubscribeApproved();
@@ -261,6 +308,8 @@ export default function AdminDashboard() {
       unsubscribeLogs();
       unsubscribeBranding();
       unsubscribeSubscriptions();
+      unsubscribeAdPay();
+      unsubscribePaySettings();
     };
   }, [user]);
 
@@ -351,7 +400,7 @@ export default function AdminDashboard() {
         read: false
       });
 
-      setErrorMsg("변호사 승인이 완료되었습니다. 증빙 서류는 보안을 위해 즉시 파기되었습니다.");
+      setSuccessMsg("변호사 승인이 완료되었습니다. 증빙 서류는 보안을 위해 즉시 파기되었습니다.");
     } catch (error) {
       console.error("Approval failed:", error);
       setErrorMsg("승인 처리 중 오류가 발생했습니다.");
@@ -380,7 +429,7 @@ export default function AdminDashboard() {
         read: false
       });
 
-      setErrorMsg("반려 처리가 완료되었습니다.");
+      setSuccessMsg("반려 처리가 완료되었습니다.");
     } catch (error) {
       console.error("Rejection failed:", error);
       setErrorMsg("반려 처리 중 오류가 발생했습니다.");
@@ -395,7 +444,7 @@ export default function AdminDashboard() {
     try {
       await deleteDoc(doc(db, 'lawyers', lawyer.id));
       await logAdminAction('DELETE_LAWYER', lawyer.id, 'Admin deleted lawyer registration');
-      setErrorMsg("변호사 등록 정보가 삭제되었습니다.");
+      setSuccessMsg("변호사 등록 정보가 삭제되었습니다.");
     } catch (error) {
       console.error("Delete failed:", error);
       setErrorMsg("삭제 중 오류가 발생했습니다.");
@@ -458,43 +507,51 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleExecuteSettlement = async (lawyerId: string, lawyerName: string, stats: any) => {
-    if (!confirm(`${lawyerName} 변호사님에 대한 정산을 실행하시겠습니까?`)) return;
-    
-    setLoading(true);
-    try {
-      const batch = writeBatch(db);
-      
-      // 1. Create settlement record
-      const settlementRef = doc(collection(db, 'settlements'));
-      batch.set(settlementRef, {
-        lawyerId,
-        lawyerName,
-        totalAmount: stats.grossRevenue,
-        platformFeeTotal: stats.platformFee,
-        pgFeeTotal: stats.pgFee,
-        netAmount: stats.netAmount,
-        status: 'completed',
-        period: new Date().toISOString().substring(0, 7), // e.g., 2024-04
-        reviewCount: stats.count,
-        createdAt: serverTimestamp(),
-        paidAt: serverTimestamp()
-      });
+  const handleExecuteSettlement = (lawyerId: string, lawyerName: string, stats: any) => {
+    setGenericConfirm({
+      show: true,
+      title: '정산 실행',
+      message: `${lawyerName} 변호사님에 대한 정산을 실행하시겠습니까?`,
+      confirmText: '정산 실행',
+      type: 'info',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const batch = writeBatch(db);
+          
+          // 1. Create settlement record
+          const settlementRef = doc(collection(db, 'settlements'));
+          batch.set(settlementRef, {
+            lawyerId,
+            lawyerName,
+            totalAmount: stats.grossRevenue,
+            platformFeeTotal: stats.platformFee,
+            pgFeeTotal: stats.pgFee,
+            netAmount: stats.netAmount,
+            status: 'completed',
+            period: new Date().toISOString().substring(0, 7), // e.g., 2024-04
+            reviewCount: stats.count,
+            createdAt: serverTimestamp(),
+            paidAt: serverTimestamp()
+          });
 
-      // 2. Update review requests to 'completed' settlement status
-      const pendingRequests = reviewRequests.filter(r => r.lawyerId === lawyerId && r.settlementStatus === 'pending' && r.status === 'completed');
-      pendingRequests.forEach(req => {
-        const reqRef = doc(db, 'review_requests', req.id);
-        batch.update(reqRef, { settlementStatus: 'completed' });
-      });
+          // 2. Update review requests to 'completed' settlement status
+          const pendingRequests = reviewRequests.filter(r => r.lawyerId === lawyerId && r.settlementStatus === 'pending' && r.status === 'completed');
+          pendingRequests.forEach(req => {
+            const reqRef = doc(db, 'review_requests', req.id);
+            batch.update(reqRef, { settlementStatus: 'completed' });
+          });
 
-      await batch.commit();
-      setErrorMsg('정산이 완료되었습니다.');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'settlements');
-    } finally {
-      setLoading(false);
-    }
+          await batch.commit();
+          setSuccessMsg('정산이 완료되었습니다.');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, 'settlements');
+        } finally {
+          setLoading(false);
+          setGenericConfirm(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
   };
 
   const handleGenerateReport = async (lawyerName: string, stats: any) => {
@@ -517,40 +574,450 @@ export default function AdminDashboard() {
   };
 
   const handleCancelSubscription = async (subId: string) => {
-    if (!confirm('정말로 이 구독을 취소하시겠습니까?')) return;
+    setGenericConfirm({
+      show: true,
+      title: '구독 취소',
+      message: '정말로 이 구독을 취소하시겠습니까? 광고 노출이 즉시 중단됩니다.',
+      confirmText: '구독 취소',
+      type: 'danger',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const subDoc = await getDoc(doc(db, 'subscriptions', subId));
+          const lawyerId = subDoc.data()?.lawyerId || subId;
+
+          const batch = writeBatch(db);
+          batch.update(doc(db, 'subscriptions', subId), {
+            status: 'inactive',
+            updatedAt: serverTimestamp()
+          });
+
+          // Update lawyer document to stop ad immediately
+          batch.set(doc(db, 'lawyers', lawyerId), {
+            adStatus: 'inactive',
+            adPlan: null,
+            priority: 0,
+            hasActiveSubscription: false,
+            cancelAtPeriodEnd: true,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+
+          // Also remove from ad slots
+          const adSlotsRef = collection(db, 'ad_slots');
+          const q = query(adSlotsRef, where('lawyerId', '==', lawyerId));
+          const adSlotsSnap = await getDocs(q);
+          adSlotsSnap.forEach((slotDoc) => {
+            batch.delete(slotDoc.ref);
+          });
+
+          await batch.commit();
+          setSuccessMsg('구독이 취소되고 광고 노출이 중단되었습니다.');
+          logAdminAction('CANCEL_SUBSCRIPTION', lawyerId, 'Subscription cancelled by admin');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, `subscriptions/${subId}`);
+        } finally {
+          setLoading(false);
+          setGenericConfirm(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
+  };
+
+  const handleDeleteSubscription = async (subId: string) => {
+    setGenericConfirm({
+      show: true,
+      title: '구독 데이터 삭제',
+      message: '정말로 이 구독 데이터를 영구적으로 삭제하시겠습니까? 광고 정보도 함께 초기화됩니다.',
+      confirmText: '영구 삭제',
+      type: 'danger',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const subDoc = await getDoc(doc(db, 'subscriptions', subId));
+          const lawyerId = subDoc.data()?.lawyerId || subId;
+          
+          const batch = writeBatch(db);
+          batch.delete(doc(db, 'subscriptions', subId));
+          
+          // Reset lawyer ad info
+          batch.set(doc(db, 'lawyers', lawyerId), {
+            adStatus: 'inactive',
+            adPlan: null,
+            adExpiryDate: null,
+            priority: 0,
+            hasActiveSubscription: false,
+            cancelAtPeriodEnd: false,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          
+          // Also remove from ad slots
+          const adSlotsRef = collection(db, 'ad_slots');
+          const q = query(adSlotsRef, where('lawyerId', '==', lawyerId));
+          const adSlotsSnap = await getDocs(q);
+          adSlotsSnap.forEach((slotDoc) => {
+            batch.delete(slotDoc.ref);
+          });
+
+          await batch.commit();
+          setSuccessMsg('구독 데이터가 삭제되고 광고 정보가 초기화되었습니다.');
+          logAdminAction('DELETE_SUBSCRIPTION', lawyerId, 'Subscription data deleted by admin');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, `subscriptions/${subId}`);
+        } finally {
+          setLoading(false);
+          setGenericConfirm(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
+  };
+
+  const handleDeleteAdRequest = async (requestId: string) => {
+    setGenericConfirm({
+      show: true,
+      title: '입금 요청 삭제',
+      message: '정말로 이 입금 확인 요청을 삭제하시겠습니까?',
+      confirmText: '삭제하기',
+      type: 'danger',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await deleteDoc(doc(db, 'ad_payment_requests', requestId));
+          setSuccessMsg('입금 요청이 삭제되었습니다.');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, `ad_payment_requests/${requestId}`);
+        } finally {
+          setLoading(false);
+          setGenericConfirm(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
+  };
+
+  const handleApproveAdPayment = async (request: any) => {
+    setGenericConfirm({
+      show: true,
+      title: '입금 확인 승인',
+      message: `${request.lawyerName} 변호사님의 입금을 확인하고 광고를 활성화하시겠습니까?`,
+      confirmText: '승인하기',
+      type: 'info',
+      onConfirm: async () => {
+        setLoading(true);
+        setProcessingId(request.id);
+        try {
+          const batch = writeBatch(db);
+          
+          // 1. Update request status
+          const requestRef = doc(db, 'ad_payment_requests', request.id);
+          batch.update(requestRef, {
+            status: 'approved',
+            approvedAt: serverTimestamp()
+          });
+          
+          // 2. Update or Create subscription
+          // Use lawyerId as the document ID for consistency with how it's queried
+          const subRef = doc(db, 'subscriptions', request.lawyerId);
+          const subSnap = await getDoc(subRef);
+          
+          const nextBillingDate = new Date();
+          nextBillingDate.setDate(nextBillingDate.getDate() + 30);
+          
+          if (subSnap.exists()) {
+            batch.update(subRef, {
+              status: 'active',
+              planType: request.planType,
+              amount: request.amount,
+              nextBillingDate: nextBillingDate,
+              updatedAt: serverTimestamp()
+            });
+          } else {
+            batch.set(subRef, {
+              lawyerId: request.lawyerId,
+              status: 'active',
+              planType: request.planType,
+              amount: request.amount,
+              nextBillingDate: nextBillingDate,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+          }
+          
+          // 3. Update lawyer document for ad visibility
+          const lawyerRef = doc(db, 'lawyers', request.lawyerId);
+          batch.set(lawyerRef, {
+            adStatus: 'active',
+            adPlan: request.planType,
+            adExpiryDate: nextBillingDate,
+            priority: request.planType === 'partnership' ? 2 : 0,
+            hasActiveSubscription: true,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+
+          await batch.commit();
+          setSuccessMsg('입금 확인 및 광고 활성화가 완료되었습니다.');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, 'ad_payment_requests');
+        } finally {
+          setLoading(false);
+          setProcessingId(null);
+          setGenericConfirm(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
+  };
+
+  const handleRejectAdPayment = async (request: any) => {
+    setAdRejectionModal({ show: true, request });
+    setCustomRejectionReason('');
+  };
+
+  const confirmAdRejection = async () => {
+    if (!adRejectionModal || !customRejectionReason.trim()) return;
     
+    const { request } = adRejectionModal;
     setLoading(true);
+    setProcessingId(request.id);
     try {
-      await updateDoc(doc(db, 'subscriptions', subId), {
-        status: 'inactive',
+      await updateDoc(doc(db, 'ad_payment_requests', request.id), {
+        status: 'rejected',
+        rejectionReason: customRejectionReason,
         updatedAt: serverTimestamp()
       });
-      setErrorMsg('구독이 취소되었습니다.');
+      setSuccessMsg('입금 확인 요청이 반려되었습니다.');
+      setAdRejectionModal(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `subscriptions/${subId}`);
+      handleFirestoreError(error, OperationType.WRITE, `ad_payment_requests/${request.id}`);
+    } finally {
+      setLoading(false);
+      setProcessingId(null);
+    }
+  };
+
+  const [adSlotModal, setAdSlotModal] = useState<{ show: boolean, slot: any | null }>({ show: false, slot: null });
+  const [adSlotForm, setAdSlotForm] = useState({
+    slotId: '',
+    lawyerName: '',
+    lawyerId: '',
+    bidAmount: 0,
+    startDate: '',
+    endDate: ''
+  });
+
+  const handleDeleteAdPayment = (requestId: string) => {
+    if (!requestId) return;
+    
+    setGenericConfirm({
+      show: true,
+      title: '입금 확인 요청 삭제',
+      message: '이 입금 확인 요청을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+      confirmText: '삭제하기',
+      type: 'danger',
+      onConfirm: async () => {
+        setLoading(true);
+        setProcessingId(requestId);
+        setErrorMsg(null);
+
+        try {
+          await deleteDoc(doc(db, 'ad_payment_requests', requestId));
+          setSuccessMsg('요청이 성공적으로 삭제되었습니다.');
+        } catch (error: any) {
+          console.error('Delete ad payment request error:', error);
+          const message = error.message || String(error);
+          if (message.includes('permission-denied')) {
+            setErrorMsg('삭제 권한이 없습니다. 관리자 권한을 확인해주세요.');
+          } else {
+            setErrorMsg(`삭제 중 오류가 발생했습니다: ${message}`);
+          }
+          
+          try {
+            handleFirestoreError(error, OperationType.DELETE, `ad_payment_requests/${requestId}`);
+          } catch (e) {
+            // handleFirestoreError throws
+          }
+        } finally {
+          setLoading(false);
+          setProcessingId(null);
+          setGenericConfirm(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
+  };
+
+  const handleSaveAdSlot = async () => {
+    if (!adSlotForm.slotId || !adSlotForm.lawyerName || !adSlotForm.bidAmount) {
+      setErrorMsg('모든 필드를 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (adSlotModal.slot) {
+        await updateDoc(doc(db, 'ad_slots', adSlotModal.slot.id), {
+          ...adSlotForm,
+          updatedAt: serverTimestamp()
+        });
+        setSuccessMsg('광고 슬롯이 수정되었습니다.');
+      } else {
+        await addDoc(collection(db, 'ad_slots'), {
+          ...adSlotForm,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        setSuccessMsg('새 광고 슬롯이 추가되었습니다.');
+      }
+      setAdSlotModal({ show: false, slot: null });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'ad_slots');
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateLawyerStats = (lawyerId: string) => {
-    const lawyerRequests = reviewRequests.filter(r => r.lawyerId === lawyerId && r.status === 'completed');
-    const pendingRequests = lawyerRequests.filter(r => r.settlementStatus === 'pending');
-    
-    const stats = {
-      grossRevenue: lawyerRequests.reduce((sum, r) => sum + (r.paymentAmount || 0), 0),
-      platformFee: lawyerRequests.reduce((sum, r) => sum + (r.platformFee || 0), 0),
-      pgFee: lawyerRequests.reduce((sum, r) => sum + (r.pgFee || 0), 0),
-      pendingBalance: pendingRequests.reduce((sum, r) => sum + (r.settlementAmount || 0), 0),
-      paidAmount: settlements.filter(s => s.lawyerId === lawyerId && s.status === 'completed').reduce((sum, s) => sum + (s.netAmount || 0), 0),
-      netAmount: pendingRequests.reduce((sum, r) => sum + (r.settlementAmount || 0), 0),
-      count: pendingRequests.length
-    };
-    
-    return stats;
+  const handleDeleteAdSlot = async (slotId: string) => {
+    setGenericConfirm({
+      show: true,
+      title: '광고 슬롯 삭제',
+      message: '이 광고 슬롯을 삭제하시겠습니까?',
+      confirmText: '삭제하기',
+      type: 'danger',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await deleteDoc(doc(db, 'ad_slots', slotId));
+          setSuccessMsg('광고 슬롯이 삭제되었습니다.');
+          setAdSlotModal({ show: false, slot: null });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, `ad_slots/${slotId}`);
+        } finally {
+          setLoading(false);
+          setGenericConfirm(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
   };
 
-  const filteredLawyers = allLawyers.filter(l => l.status === lawyerFilter);
+  const handleSavePaymentSettings = async () => {
+    if (!editPayForm) return;
+    setLoading(true);
+    try {
+      await setDoc(doc(db, 'app_settings', 'payment'), {
+        ...editPayForm,
+        updatedAt: serverTimestamp()
+      });
+      setIsEditingPayment(false);
+      setSuccessMsg('결제 설정이 저장되었습니다.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'app_settings/payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveSubscription = async () => {
+    if (!subEditModal.sub) return;
+    setLoading(true);
+    try {
+      const subRef = doc(db, 'subscriptions', subEditModal.sub.id);
+      await updateDoc(subRef, {
+        ...subEditForm,
+        updatedAt: serverTimestamp()
+      });
+
+      // Also update the lawyer document to keep it in sync
+      const lawyerRef = doc(db, 'lawyers', subEditModal.sub.lawyerId);
+      await updateDoc(lawyerRef, {
+        adPlan: subEditForm.planType,
+        adStatus: subEditForm.status === 'active' ? 'active' : 'inactive',
+        priority: subEditForm.status === 'active' ? (subEditForm.planType === 'partnership' ? 2 : 0) : 0,
+        hasActiveSubscription: subEditForm.status === 'active',
+        updatedAt: serverTimestamp()
+      });
+
+      // If status is changed to inactive, also remove from ad slots
+      if (subEditForm.status !== 'active') {
+        const adSlotsRef = collection(db, 'ad_slots');
+        const q = query(adSlotsRef, where('lawyerId', '==', subEditModal.sub.lawyerId));
+        const adSlotsSnap = await getDocs(q);
+        const deleteBatch = writeBatch(db);
+        adSlotsSnap.forEach((slotDoc) => {
+          deleteBatch.delete(slotDoc.ref);
+        });
+        await deleteBatch.commit();
+      }
+
+      setSubEditModal({ show: false, sub: null });
+      setSuccessMsg('구독 정보가 수정되었습니다.');
+      logAdminAction('UPDATE_SUBSCRIPTION', subEditModal.sub.lawyerId, `Plan updated to ${subEditForm.planType}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `subscriptions/${subEditModal.sub.id}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualCharge = async (lawyer: any) => {
+    if (!lawyer.billingKey) {
+      setErrorMsg('등록된 빌링키가 없습니다.');
+      return;
+    }
+    
+    const amount = prompt('결제할 금액을 입력하세요:', '55000');
+    if (!amount) return;
+
+    setLoading(true);
+    try {
+      // In a real app, this would call a Cloud Function
+      // For now, we'll simulate a successful charge by adding a subscription record
+      const nextBillingDate = new Date();
+      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
+      await setDoc(doc(db, 'subscriptions', lawyer.id), {
+        lawyerId: lawyer.id,
+        status: 'active',
+        planType: 'manual',
+        amount: Number(amount),
+        nextBillingDate: nextBillingDate,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      await addDoc(collection(db, 'admin_access_logs'), {
+        adminId: user?.uid,
+        adminName: user?.displayName || 'Admin',
+        action: 'MANUAL_CHARGE',
+        targetUser: lawyer.id,
+        reason: `Manual charge of ${amount} executed by admin`,
+        timestamp: serverTimestamp()
+      });
+
+      setErrorMsg(`${lawyer.displayName || lawyer.name} 변호사님께 ${amount}원 결제가 요청되었습니다. (시뮬레이션)`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `subscriptions/${lawyer.id}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredLawyers = useMemo(() => {
+    return allLawyers.filter(l => l.status === lawyerFilter);
+  }, [allLawyers, lawyerFilter]);
+
+  const lawyerStatsMap = useMemo(() => {
+    const map = new Map();
+    approvedLawyers.forEach(lawyer => {
+      const lawyerRequests = reviewRequests.filter(r => r.lawyerId === lawyer.uid && r.status === 'completed');
+      const pendingRequests = lawyerRequests.filter(r => r.settlementStatus === 'pending');
+      
+      map.set(lawyer.uid, {
+        grossRevenue: lawyerRequests.reduce((sum, r) => sum + (r.paymentAmount || 0), 0),
+        platformFee: lawyerRequests.reduce((sum, r) => sum + (r.platformFee || 0), 0),
+        pgFee: lawyerRequests.reduce((sum, r) => sum + (r.pgFee || 0), 0),
+        pendingBalance: pendingRequests.reduce((sum, r) => sum + (r.settlementAmount || 0), 0),
+        paidAmount: settlements.filter(s => s.lawyerId === lawyer.uid && s.status === 'completed').reduce((sum, s) => sum + (s.netAmount || 0), 0),
+        netAmount: pendingRequests.reduce((sum, r) => sum + (r.settlementAmount || 0), 0),
+        count: pendingRequests.length
+      });
+    });
+    return map;
+  }, [approvedLawyers, reviewRequests, settlements]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -561,11 +1028,31 @@ export default function AdminDashboard() {
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
                 <AlertCircle className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800">알림</h3>
+              <h3 className="text-xl font-bold text-slate-800">오류 발생</h3>
               <p className="text-sm text-slate-600">{errorMsg}</p>
               <button 
                 onClick={() => setErrorMsg(null)}
-                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+                className="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">성공</h3>
+              <p className="text-sm text-slate-600">{successMsg}</p>
+              <button 
+                onClick={() => setSuccessMsg(null)}
+                className="w-full py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors"
               >
                 확인
               </button>
@@ -577,7 +1064,7 @@ export default function AdminDashboard() {
         <div>
           <h2 className="text-2xl font-bold text-[#0F172A] font-serif flex items-center gap-2">
             <ShieldCheck className="w-7 h-7 text-brand-600" />
-            관리자 대시보드
+            관리자 설정
           </h2>
           <p className="text-[#64748B] mt-1">플랫폼 운영 및 보안 관리를 위한 통합 대시보드</p>
         </div>
@@ -816,7 +1303,7 @@ export default function AdminDashboard() {
                               <button 
                                 onClick={() => handleAuditAction('SAMPLE_REPORT', req.id, (reason) => {
                                   logAdminAction('SAMPLE_REPORT', req.userId, reason);
-                                  setErrorMsg("품질 검수를 위한 리포트 열람 권한이 부여되었습니다.");
+                                  setSuccessMsg("품질 검수를 위한 리포트 열람 권한이 부여되었습니다.");
                                 })}
                                 className="p-2 hover:bg-brand-50 rounded-lg text-brand-600 transition-colors"
                                 title="리포트 샘플링 검수"
@@ -871,7 +1358,9 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {approvedLawyers.map((lawyer) => {
-                        const stats = calculateLawyerStats(lawyer.uid);
+                        const stats = lawyerStatsMap.get(lawyer.uid) || {
+                          grossRevenue: 0, platformFee: 0, pgFee: 0, pendingBalance: 0, paidAmount: 0, netAmount: 0, count: 0
+                        };
                         return (
                           <tr key={lawyer.id} className="group hover:bg-slate-50/50 transition-all">
                             <td className="py-4">
@@ -927,61 +1416,106 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-3xl border border-[#E2E8F0] p-6 space-y-6">
-                  <h3 className="font-bold text-lg flex items-center gap-2">
-                    <Megaphone className="w-5 h-5 text-brand-600" />
-                    광고 슬롯 관리
-                  </h3>
-                  <div className="space-y-4">
+                <div className="bg-white rounded-[2.5rem] border border-[#E2E8F0] p-8 shadow-sm hover:shadow-md transition-shadow space-y-6 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-50/50 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-brand-100/50 transition-colors" />
+                  
+                  <div className="flex items-center justify-between relative">
+                    <h3 className="font-black text-xl flex items-center gap-3 text-slate-900">
+                      <div className="w-10 h-10 rounded-2xl bg-brand-50 flex items-center justify-center">
+                        <Megaphone className="w-5 h-5 text-brand-600" />
+                      </div>
+                      광고 슬롯 관리
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-1 bg-slate-100 text-slate-500 rounded-lg">
+                      {adSlots.length}개 슬롯 운영 중
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 relative">
                     {adSlots.map((slot) => (
-                      <div key={slot.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">{slot.slotId}</span>
-                            <h4 className="font-bold">{slot.lawyerName}</h4>
+                      <div key={slot.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30 hover:bg-white hover:shadow-lg hover:shadow-slate-100 transition-all flex items-center justify-between group/item">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center font-black text-brand-600 text-xs shadow-sm">
+                            {slot.slotId}
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">입찰가: {slot.bidAmount.toLocaleString()}원 | 기간: {slot.startDate} ~ {slot.endDate}</p>
+                          <div>
+                            <h4 className="font-bold text-slate-800">{slot.lawyerName}</h4>
+                            <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                              입찰: <span className="text-brand-600 font-bold">{slot.bidAmount.toLocaleString()}원</span> | {slot.startDate} ~ {slot.endDate}
+                            </p>
+                          </div>
                         </div>
-                        <button className="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition-all">
-                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        <button 
+                          onClick={() => {
+                            setAdSlotModal({ show: true, slot });
+                            setAdSlotForm({
+                              slotId: slot.slotId,
+                              lawyerName: slot.lawyerName,
+                              lawyerId: slot.lawyerId || '',
+                              bidAmount: slot.bidAmount,
+                              startDate: slot.startDate,
+                              endDate: slot.endDate
+                            });
+                          }}
+                          className="p-2 hover:bg-brand-50 rounded-xl transition-all group-hover/item:translate-x-1"
+                        >
+                          <ChevronRight className="w-5 h-5 text-slate-300 group-hover/item:text-brand-600" />
                         </button>
                       </div>
                     ))}
-                    <button className="w-full py-4 border-2 border-dashed border-slate-200 bg-slate-50/50 rounded-2xl text-slate-500 text-sm font-bold hover:bg-brand-50 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2 group">
-                      <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-brand-300 group-hover:bg-brand-100 transition-colors shadow-sm">
-                        <Plus className="w-4 h-4" />
+                    <button 
+                      onClick={() => {
+                        setAdSlotModal({ show: true, slot: null });
+                        setAdSlotForm({
+                          slotId: '',
+                          lawyerName: '',
+                          lawyerId: '',
+                          bidAmount: 0,
+                          startDate: new Date().toISOString().split('T')[0],
+                          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                        });
+                      }}
+                      className="w-full py-5 border-2 border-dashed border-slate-200 bg-slate-50/50 rounded-[2rem] text-slate-500 text-sm font-black hover:bg-brand-50 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-3 group/btn"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover/btn:border-brand-300 group-hover/btn:bg-brand-100 transition-all shadow-sm">
+                        <Plus className="w-5 h-5" />
                       </div>
-                      새 광고 슬롯 추가
+                      새 광고 슬롯 추가하기
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-3xl border border-[#E2E8F0] p-6 space-y-6">
-                  <h3 className="font-bold text-lg flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-brand-600" />
+                <div className="bg-white rounded-[2.5rem] border border-[#E2E8F0] p-8 shadow-sm hover:shadow-md transition-shadow space-y-6">
+                  <h3 className="font-black text-xl flex items-center gap-3 text-slate-900">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-amber-600" />
+                    </div>
                     최근 정산 완료 내역
                   </h3>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {settlements.map((s) => (
-                      <div key={s.id} className="p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center">
-                            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      <div key={s.id} className="p-5 rounded-2xl border border-slate-100 hover:border-brand-100 hover:bg-brand-50/10 transition-all flex items-center justify-between group">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-white transition-colors shadow-sm">
+                            <CheckCircle2 className="w-6 h-6 text-green-500" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-sm">{s.lawyerName}</h4>
-                            <p className="text-[10px] text-slate-400">{s.period} 정산 완료 | {s.reviewCount}건</p>
+                            <h4 className="font-black text-slate-800">{s.lawyerName}</h4>
+                            <p className="text-[10px] text-slate-400 font-medium mt-0.5">{s.period} 정산 완료 | {s.reviewCount}건의 상담</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-brand-600">{s.netAmount.toLocaleString()}원</p>
-                          <p className="text-[10px] text-slate-400">수수료: {s.platformFeeTotal?.toLocaleString()}원</p>
+                          <p className="font-black text-lg text-brand-600">{s.netAmount.toLocaleString()}원</p>
+                          <p className="text-[10px] text-slate-400 font-bold">수수료: {s.platformFeeTotal?.toLocaleString()}원</p>
                         </div>
                       </div>
                     ))}
                     {settlements.length === 0 && (
-                      <div className="py-12 text-center text-slate-400 text-sm">
-                        정산 내역이 없습니다.
+                      <div className="py-16 text-center">
+                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <FileText className="w-8 h-8 text-slate-200" />
+                        </div>
+                        <p className="text-slate-400 text-sm font-medium">최근 정산 내역이 없습니다.</p>
                       </div>
                     )}
                   </div>
@@ -1165,7 +1699,9 @@ export default function AdminDashboard() {
                   <thead>
                     <tr className="text-left text-slate-400 border-b border-slate-50">
                       <th className="p-6 font-bold whitespace-nowrap">변호사 ID</th>
+                      <th className="p-6 font-bold whitespace-nowrap">빌링키 여부</th>
                       <th className="p-6 font-bold whitespace-nowrap">플랜</th>
+                      <th className="p-6 font-bold whitespace-nowrap">광고 연동</th>
                       <th className="p-6 font-bold whitespace-nowrap">결제 금액</th>
                       <th className="p-6 font-bold whitespace-nowrap">다음 결제일</th>
                       <th className="p-6 font-bold whitespace-nowrap">상태</th>
@@ -1175,15 +1711,47 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-slate-50">
                     {subscriptions.map((sub) => (
                       <tr key={sub.id} className="hover:bg-slate-50/50 transition-all">
-                        <td className="p-6 font-medium text-slate-700 whitespace-nowrap">{sub.lawyerId}</td>
+                        <td className="p-6 font-medium text-slate-700 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {sub.lawyerId}
+                            <button 
+                              onClick={() => handleDeleteSubscription(sub.id)}
+                              className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+                              title="구독 데이터 삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-6 whitespace-nowrap">
+                          {sub.billingKey ? (
+                            <span className="flex items-center gap-1 text-green-600 font-bold text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> 등록됨
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-slate-400 text-[10px]">
+                              <XCircle className="w-3 h-3" /> 미등록
+                            </span>
+                          )}
+                        </td>
                         <td className="p-6 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                            sub.planType === 'premium' ? 'bg-purple-100 text-purple-600' :
-                            sub.planType === 'standard' ? 'bg-blue-100 text-blue-600' :
-                            'bg-slate-100 text-slate-600'
+                            sub.planType === 'partnership' ? 'bg-brand-100 text-brand-600' : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {sub.planType}
+                            {sub.planType === 'partnership' ? '파트너십' : '미가입'}
                           </span>
+                        </td>
+                        <td className="p-6 whitespace-nowrap">
+                          {(() => {
+                            const lawyer = allLawyers.find(l => l.id === sub.lawyerId || l.uid === sub.lawyerId);
+                            const isAdActive = lawyer?.adStatus === 'active';
+                            return (
+                              <span className={`flex items-center gap-1.5 text-[10px] font-bold ${isAdActive ? 'text-brand-600' : 'text-slate-400'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${isAdActive ? 'bg-brand-600 animate-pulse' : 'bg-slate-300'}`} />
+                                {isAdActive ? '광고 노출 중' : '광고 중단됨'}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="p-6 font-bold text-slate-900 whitespace-nowrap">{sub.amount?.toLocaleString()}원</td>
                         <td className="p-6 text-slate-500 whitespace-nowrap">{sub.nextBillingDate?.toDate().toLocaleDateString()}</td>
@@ -1197,14 +1765,43 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="p-6 text-right whitespace-nowrap">
-                          {sub.status === 'active' && (
+                          <div className="flex items-center justify-end gap-3">
+                            {sub.billingKey && (
+                              <button
+                                onClick={() => handleManualCharge(sub)}
+                                className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors"
+                              >
+                                수동 결제 실행
+                              </button>
+                            )}
                             <button
-                              onClick={() => handleCancelSubscription(sub.id)}
-                              className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors"
+                              onClick={() => {
+                                setSubEditModal({ show: true, sub });
+                                setSubEditForm({
+                                  planType: sub.planType || 'partnership',
+                                  amount: sub.amount || 0,
+                                  status: sub.status || 'active'
+                                });
+                              }}
+                              className="text-xs font-bold text-slate-600 hover:text-brand-600 transition-colors"
                             >
-                              구독 취소
+                              수정
                             </button>
-                          )}
+                            {sub.status === 'active' && (
+                              <button
+                                onClick={() => handleCancelSubscription(sub.id)}
+                                className="text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors"
+                              >
+                                구독 취소
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteSubscription(sub.id)}
+                              className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors"
+                            >
+                              삭제
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1230,6 +1827,162 @@ export default function AdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-8"
           >
+            {/* Payment Settings Section */}
+            <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-[#F1F5F9] flex items-center justify-between">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Settings2 className="w-5 h-5 text-brand-600" />
+                  광고 플랜 및 결제 시스템 설정
+                </h3>
+                <button 
+                  onClick={() => {
+                    setEditPayForm(paymentSettings || {
+                      active_method: 'toss_direct',
+                      account_info: { bank: '토스뱅크', account_number: '', holder: '박정환' },
+                      ad_plans: { partnership: 99000 }
+                    });
+                    setIsEditingPayment(true);
+                  }}
+                  className="px-4 py-2 bg-brand-50 text-brand-600 rounded-xl text-xs font-bold hover:bg-brand-100 transition-all"
+                >
+                  설정 수정
+                </button>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">활성 결제 수단</p>
+                  <p className="text-sm font-bold text-slate-700">
+                    {paymentSettings?.active_method === 'tosspayments' ? '토스페이먼츠 정기 결제 (Billing)' : 
+                     paymentSettings?.active_method === 'toss_direct' ? '토스 직접 송금 (App-in-Toss)' : 'PortOne 정기 결제'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">입금 계좌 정보</p>
+                  <p className="text-sm font-bold text-slate-700">
+                    {paymentSettings?.account_info?.bank} {paymentSettings?.account_info?.account_number}
+                  </p>
+                  <p className="text-[10px] text-slate-500">예금주: {paymentSettings?.account_info?.holder}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">광고 플랜 가격</p>
+                  <p className="text-xs text-slate-600">
+                    Partnership: {paymentSettings?.ad_plans?.partnership?.toLocaleString()}원
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ad Payment Requests Section */}
+            <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-[#F1F5F9] flex items-center justify-between">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-brand-600" />
+                  광고 입금 확인 요청 (Pending)
+                </h3>
+                <span className="text-xs font-medium px-2 py-1 bg-amber-50 text-amber-600 rounded-full">
+                  대기 중: {adPaymentRequests.filter(r => r.status === 'pending').length}건
+                </span>
+              </div>
+              <div className="overflow-x-auto -mx-6 px-6">
+                <table className="w-full text-sm min-w-[800px]">
+                  <thead>
+                    <tr className="text-left text-slate-400 border-b border-slate-50">
+                      <th className="p-6 font-bold whitespace-nowrap">요청 일시</th>
+                      <th className="p-6 font-bold whitespace-nowrap">변호사</th>
+                      <th className="p-6 font-bold whitespace-nowrap">플랜</th>
+                      <th className="p-6 font-bold whitespace-nowrap">입금 금액</th>
+                      <th className="p-6 font-bold whitespace-nowrap">상태</th>
+                      <th className="p-6 font-bold text-right whitespace-nowrap">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {adPaymentRequests.map((req) => (
+                      <tr key={req.id} className="hover:bg-slate-50/50 transition-all">
+                        <td className="p-6 text-slate-500 whitespace-nowrap">{req.createdAt?.toDate().toLocaleString()}</td>
+                        <td className="p-6 font-medium text-slate-700 whitespace-nowrap">{req.lawyerName}</td>
+                        <td className="p-6 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
+                            req.planType === 'partnership' ? 'bg-brand-100 text-brand-600' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {req.planType === 'partnership' ? '파트너십' : '미가입'}
+                          </span>
+                        </td>
+                        <td className="p-6 font-bold text-brand-600 whitespace-nowrap">{req.amount?.toLocaleString()}원</td>
+                        <td className="p-6 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                            req.status === 'approved' ? 'bg-green-100 text-green-600' :
+                            req.status === 'rejected' ? 'bg-red-100 text-red-600' :
+                            'bg-amber-100 text-amber-600'
+                          }`}>
+                            {req.status === 'approved' ? '입금 확인됨' : req.status === 'rejected' ? '반려됨' : '입금 대기'}
+                          </span>
+                        </td>
+                        <td className="p-6 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                const lawyerInfo = allLawyers.find(l => l.uid === req.lawyerId) || { name: req.lawyerName, uid: req.lawyerId };
+                                setPreviewModal({ show: true, lawyer: lawyerInfo, planType: req.planType });
+                              }}
+                              className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
+                              title="미리보기"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAdRequest(req.id)}
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            {req.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => handleRejectAdPayment(req)}
+                                  disabled={loading && processingId === req.id}
+                                  className="px-4 py-2 border border-red-200 text-red-600 rounded-xl text-xs font-bold hover:bg-red-50 hover:border-red-300 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                >
+                                  {loading && processingId === req.id ? '처리 중...' : '반려'}
+                                </button>
+                                <button
+                                  onClick={() => handleApproveAdPayment(req)}
+                                  disabled={loading && processingId === req.id}
+                                  className="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 transition-all shadow-md shadow-brand-100 active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                                >
+                                  {loading && processingId === req.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                  )}
+                                  {loading && processingId === req.id ? '승인 중...' : '입금 확인'}
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => handleDeleteAdPayment(req.id)}
+                              disabled={loading && processingId === req.id}
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {adPaymentRequests.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-12 text-center text-slate-400">
+                          입금 확인 요청이 없습니다.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* Payment History Section */}
             <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
               <div className="p-6 border-b border-[#F1F5F9]">
@@ -1279,6 +2032,119 @@ export default function AdminDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Payment Settings Modal */}
+      <AnimatePresence>
+        {isEditingPayment && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[140] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-lg bg-white rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-[#0F172A]">광고 플랜 및 결제 시스템 설정 수정</h3>
+                <button onClick={() => setIsEditingPayment(false)} className="p-2 hover:bg-slate-100 rounded-full">
+                  <XCircle className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">활성 결제 수단</label>
+                  <select 
+                    value={editPayForm.active_method}
+                    onChange={(e) => setEditPayForm({ ...editPayForm, active_method: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm bg-white"
+                  >
+                    <option value="tosspayments">토스페이먼츠 정기 결제 (Billing)</option>
+                    <option value="toss_direct">토스 직접 송금 (App-in-Toss)</option>
+                    <option value="portone">PortOne 정기 결제</option>
+                  </select>
+                </div>
+
+                {editPayForm.active_method === 'tosspayments' && (
+                  <div className="space-y-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                    <label className="text-xs font-bold text-blue-700 uppercase tracking-wider">Toss Payments API 설정</label>
+                    <input 
+                      type="text"
+                      placeholder="Client Key (test_ck_...)"
+                      value={editPayForm.clientKey}
+                      onChange={(e) => setEditPayForm({ ...editPayForm, clientKey: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm"
+                    />
+                    <p className="text-[10px] text-blue-600">
+                      * 서버 측 Secret Key는 환경 변수(TOSS_SECRET_KEY)로 관리해 주세요.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">입금 계좌 정보</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <input 
+                      type="text"
+                      placeholder="은행명 (예: 토스뱅크)"
+                      value={editPayForm.account_info?.bank}
+                      onChange={(e) => setEditPayForm({ ...editPayForm, account_info: { ...editPayForm.account_info, bank: e.target.value } })}
+                      className="px-4 py-3 rounded-xl border border-slate-200 text-sm"
+                    />
+                    <input 
+                      type="text"
+                      placeholder="예금주"
+                      value={editPayForm.account_info?.holder}
+                      onChange={(e) => setEditPayForm({ ...editPayForm, account_info: { ...editPayForm.account_info, holder: e.target.value } })}
+                      className="px-4 py-3 rounded-xl border border-slate-200 text-sm"
+                    />
+                  </div>
+                  <input 
+                    type="text"
+                    placeholder="계좌번호"
+                    value={editPayForm.account_info?.account_number}
+                    onChange={(e) => setEditPayForm({ ...editPayForm, account_info: { ...editPayForm.account_info, account_number: e.target.value } })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">광고 플랜 가격 (원)</label>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block mb-1">파트너십</span>
+                      <input 
+                        type="number"
+                        value={editPayForm.ad_plans?.partnership}
+                        onChange={(e) => setEditPayForm({ ...editPayForm, ad_plans: { ...editPayForm.ad_plans, partnership: Number(e.target.value) } })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setIsEditingPayment(false)}
+                    className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-bold text-[#64748B] hover:bg-slate-50 transition-all"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleSavePaymentSettings}
+                    className="flex-1 py-3 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-all"
+                  >
+                    설정 저장
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Secure Viewer Modal */}
       <AnimatePresence>
         {showSecureViewer && (
@@ -1592,6 +2458,61 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
 
+      {/* Ad Payment Rejection Modal */}
+      <AnimatePresence>
+        {adRejectionModal?.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[130] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6">
+                <XCircle className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-[#0F172A] mb-2">광고 입금 확인 반려</h3>
+              <p className="text-sm text-[#64748B] mb-6">
+                {adRejectionModal.request.lawyerName} 변호사님의 입금 확인 요청을 반려하시겠습니까? 반려 사유를 입력해 주세요.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">반려 사유</label>
+                  <textarea 
+                    value={customRejectionReason}
+                    onChange={(e) => setCustomRejectionReason(e.target.value)}
+                    placeholder="예: 입금자명이 일치하지 않음, 입금 금액 부족 등"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm h-32 resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setAdRejectionModal(null)}
+                    className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-bold text-[#64748B] hover:bg-slate-50 transition-all"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={confirmAdRejection}
+                    disabled={!customRejectionReason.trim() || loading}
+                    className="flex-1 py-3 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    반려 확정
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Audit Reason Modal */}
       <AnimatePresence>
         {auditReason.show && (
@@ -1649,6 +2570,303 @@ export default function AdminDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Ad Slot Modal */}
+      <AnimatePresence>
+        {subEditModal.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-[#0F172A]">구독 정보 수정</h3>
+                <button 
+                  onClick={() => setSubEditModal({ show: false, sub: null })}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">플랜 유형</label>
+                  <select 
+                    value={subEditForm.planType}
+                    onChange={(e) => setSubEditForm({ ...subEditForm, planType: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  >
+                    <option value="partnership">파트너십</option>
+                    <option value="basic">베이직</option>
+                    <option value="standard">스탠다드</option>
+                    <option value="premium">프리미엄</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">결제 금액 (원)</label>
+                  <input 
+                    type="number"
+                    value={subEditForm.amount}
+                    onChange={(e) => setSubEditForm({ ...subEditForm, amount: parseInt(e.target.value) || 0 })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">구독 상태</label>
+                  <select 
+                    value={subEditForm.status}
+                    onChange={(e) => setSubEditForm({ ...subEditForm, status: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  >
+                    <option value="active">활성</option>
+                    <option value="inactive">비활성</option>
+                    <option value="failed">결제 실패</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleSaveSubscription}
+                    disabled={loading}
+                    className="flex-1 py-4 bg-brand-600 text-white rounded-2xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-100 disabled:opacity-50"
+                  >
+                    {loading ? '저장 중...' : '설정 저장'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {adSlotModal.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-[#0F172A]">
+                  {adSlotModal.slot ? '광고 슬롯 수정' : '새 광고 슬롯 추가'}
+                </h3>
+                <button 
+                  onClick={() => setAdSlotModal({ show: false, slot: null })}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">슬롯 ID</label>
+                  <input 
+                    type="text"
+                    value={adSlotForm.slotId}
+                    onChange={(e) => setAdSlotForm({ ...adSlotForm, slotId: e.target.value })}
+                    placeholder="예: MAIN_TOP_1"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">변호사 선택</label>
+                  <select 
+                    value={adSlotForm.lawyerId}
+                    onChange={(e) => {
+                      const lawyer = approvedLawyers.find(l => l.uid === e.target.value);
+                      setAdSlotForm({ 
+                        ...adSlotForm, 
+                        lawyerId: e.target.value,
+                        lawyerName: lawyer ? lawyer.name : ''
+                      });
+                    }}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  >
+                    <option value="">변호사 선택</option>
+                    {approvedLawyers.map(l => (
+                      <option key={l.id} value={l.uid}>{l.name} ({l.firmName || '개인'})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">입찰가 (원)</label>
+                  <input 
+                    type="number"
+                    value={adSlotForm.bidAmount}
+                    onChange={(e) => setAdSlotForm({ ...adSlotForm, bidAmount: parseInt(e.target.value) || 0 })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">시작일</label>
+                    <input 
+                      type="date"
+                      value={adSlotForm.startDate}
+                      onChange={(e) => setAdSlotForm({ ...adSlotForm, startDate: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">종료일</label>
+                    <input 
+                      type="date"
+                      value={adSlotForm.endDate}
+                      onChange={(e) => setAdSlotForm({ ...adSlotForm, endDate: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  {adSlotModal.slot && (
+                    <button
+                      onClick={() => handleDeleteAdSlot(adSlotModal.slot.id)}
+                      className="px-4 py-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-all"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveAdSlot}
+                    disabled={loading}
+                    className="flex-1 py-3 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    저장하기
+                  </button>
+                </div>
+
+                {/* Ad Preview Section */}
+                {adSlotForm.lawyerId && (
+                  <div className="mt-8 pt-8 border-t border-slate-100">
+                    <AdPreview 
+                      planType="partnership" 
+                      lawyerInfo={approvedLawyers.find(l => l.uid === adSlotForm.lawyerId) || {}} 
+                    />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Ad Preview Modal */}
+      <AnimatePresence>
+        {previewModal?.show && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl border border-slate-200 relative overflow-hidden"
+            >
+              <button 
+                onClick={() => setPreviewModal(null)}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all z-10"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-brand-50 rounded-xl">
+                    <Megaphone className="w-6 h-6 text-brand-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">광고 미리보기</h3>
+                    <p className="text-sm text-slate-500">선택된 플랜에 따른 실제 노출 모습입니다.</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <AdPreview 
+                    planType="partnership" 
+                    lawyerInfo={previewModal.lawyer} 
+                  />
+                </div>
+
+                <div className="pt-4">
+                  <button 
+                    onClick={() => setPreviewModal(null)}
+                    className="w-full py-4 rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Generic Confirmation Modal */}
+      <AnimatePresence>
+        {genericConfirm.show && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200"
+            >
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className={`p-4 rounded-full ${genericConfirm.type === 'danger' ? 'bg-red-50' : 'bg-brand-50'}`}>
+                  {genericConfirm.type === 'danger' ? (
+                    <Trash2 className="w-8 h-8 text-red-600" />
+                  ) : (
+                    <AlertCircle className="w-8 h-8 text-brand-600" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-900">{genericConfirm.title}</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
+                    {genericConfirm.message}
+                  </p>
+                </div>
+                <div className="flex gap-3 w-full pt-4">
+                  <button 
+                    onClick={() => setGenericConfirm(prev => ({ ...prev, show: false }))}
+                    className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all"
+                  >
+                    취소
+                  </button>
+                  <button 
+                    onClick={genericConfirm.onConfirm}
+                    disabled={loading}
+                    className={`flex-1 py-3 rounded-xl text-white font-bold transition-all shadow-lg flex items-center justify-center gap-2 ${
+                      genericConfirm.type === 'danger' 
+                        ? 'bg-red-600 hover:bg-red-700 shadow-red-100' 
+                        : 'bg-brand-600 hover:bg-brand-700 shadow-brand-100'
+                    }`}
+                  >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {genericConfirm.confirmText || '확인'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deleteConfirm && (

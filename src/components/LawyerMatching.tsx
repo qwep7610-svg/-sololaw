@@ -19,6 +19,9 @@ interface Lawyer {
   isPaidAd?: boolean;
   lastActiveAt?: any;
   profileImageUrl?: string;
+  adPlan?: string;
+  priority?: number;
+  hasActiveSubscription?: boolean;
 }
 
 interface LawyerMatchingProps {
@@ -76,50 +79,56 @@ export default function LawyerMatching({ primaryCategory, keywords, userCaseSumm
         });
 
         // 4. Apply Matching Priority Algorithm
-        // Weights: Paid Ad (100), Active (50), Local (40), Response Time (Up to 40), Specialty Match (20)
-        const sortedLawyers = fetchedLawyers.sort((a, b) => {
-          let scoreA = 0;
-          let scoreB = 0;
+        // Weights: Priority (1000), Local (40), Response Time (Up to 40), Specialty Match (20)
+        const scoredLawyers = fetchedLawyers.map(lawyer => {
+          let score = 0;
 
-          // Paid First
-          if (a.isPaidAd) scoreA += 100;
-          if (b.isPaidAd) scoreB += 100;
+          // Priority (Ad Plan)
+          score += (lawyer.priority || 0) * 1000;
 
           // Active First (lastActiveAt within 24h)
           const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-          if (a.lastActiveAt?.toMillis() > oneDayAgo) scoreA += 50;
-          if (b.lastActiveAt?.toMillis() > oneDayAgo) scoreB += 50;
+          if (lawyer.lastActiveAt?.toMillis() > oneDayAgo) score += 50;
 
           // Location Match
-          if (currentCity && a.location.includes(currentCity)) scoreA += 40;
-          if (currentCity && b.location.includes(currentCity)) scoreB += 40;
+          if (currentCity && lawyer.location.includes(currentCity)) score += 40;
 
           // Response Time Weight
-          const timeA = parseResponseTimeToMinutes(a.avgResponseTime);
-          const timeB = parseResponseTimeToMinutes(b.avgResponseTime);
-          
-          if (timeA <= 30) scoreA += 40;
-          else if (timeA <= 60) scoreA += 30;
-          else if (timeA <= 180) scoreA += 20;
-          else if (timeA <= 1440) scoreA += 10;
-
-          if (timeB <= 30) scoreB += 40;
-          else if (timeB <= 60) scoreB += 30;
-          else if (timeB <= 180) scoreB += 20;
-          else if (timeB <= 1440) scoreB += 10;
+          const time = parseResponseTimeToMinutes(lawyer.avgResponseTime);
+          if (time <= 30) score += 40;
+          else if (time <= 60) score += 30;
+          else if (time <= 180) score += 20;
+          else if (time <= 1440) score += 10;
 
           // Specialty Match
-          if (a.specialties.some(s => s.includes(primaryCategory))) scoreA += 20;
-          if (b.specialties.some(s => s.includes(primaryCategory))) scoreB += 20;
+          if (lawyer.specialties.some(s => s.includes(primaryCategory))) score += 20;
 
           // Rating/Review weight
-          scoreA += (a.rating * 2) + (a.reviewCount / 10);
-          scoreB += (b.rating * 2) + (b.reviewCount / 10);
+          score += (lawyer.rating * 2) + (lawyer.reviewCount / 10);
 
-          return scoreB - scoreA;
+          return { ...lawyer, matchingScore: score };
         });
 
-        setLawyers(sortedLawyers.slice(0, 5)); // Show top 5
+        // Group by score and shuffle within same score for fairness
+        const groupedByScore = scoredLawyers.reduce((acc, lawyer) => {
+          const s = lawyer.matchingScore;
+          if (!acc[s]) acc[s] = [];
+          acc[s].push(lawyer);
+          return acc;
+        }, {} as Record<number, any[]>);
+
+        const fairLawyers = Object.keys(groupedByScore)
+          .sort((a, b) => Number(b) - Number(a))
+          .flatMap(s => {
+            const arr = groupedByScore[Number(s)];
+            for (let i = arr.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+          });
+
+        setLawyers(fairLawyers.slice(0, 5)); // Show top 5
       } catch (error) {
         console.error("Error matching lawyers:", error);
       } finally {
@@ -176,6 +185,11 @@ export default function LawyerMatching({ primaryCategory, keywords, userCaseSumm
                     </div>
                   )}
                 </div>
+                {lawyer.adPlan === 'partnership' && (
+                  <div className="absolute -top-2 -left-2 bg-indigo-600 text-white p-1 rounded-lg shadow-md border-2 border-white z-10" title="솔로로 공식 파트너">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  </div>
+                )}
                 {lawyer.rating >= 4.8 && (
                   <div className="absolute -bottom-1 -right-1 bg-amber-400 text-white p-1 rounded-lg shadow-sm">
                     <Star className="w-3 h-3 fill-current" />

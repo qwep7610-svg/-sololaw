@@ -12,32 +12,39 @@ interface OnboardingStep {
 
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    title: "소송의 주인공들",
-    term: "원고 vs 피고",
-    definition: "소송을 시작한 사람을 '원고', 소송을 당한 사람을 '피고'라고 부릅니다.",
-    tip: "나홀로 소송을 준비하신다면 대부분 '원고'의 입장에서 시작하시게 될 거예요.",
+    title: "Step 1. 상황 진단",
+    term: "나의 소송 유형 찾기",
+    definition: "지금 겪고 계신 상황을 일상어로 설명해 주세요. AI가 민사, 가사, 형사 등 가장 적합한 소송 유형을 찾아드립니다.",
+    tip: "복잡한 법률 용어를 몰라도 괜찮습니다. AI가 당신의 이야기를 법률적 관점에서 분석하여 핵심 쟁점을 짚어줍니다.",
     icon: <Scale className="w-12 h-12 text-brand-600" />
   },
   {
-    title: "소송의 시작",
-    term: "소장 (Complaint)",
-    definition: "내가 왜 소송을 하는지, 무엇을 원하는지 적어서 법원에 내는 첫 번째 서류입니다.",
-    tip: "SoloLaw AI가 여러분의 사연을 법률 용어로 가득 찬 멋진 소장으로 바꿔드립니다.",
+    title: "Step 2. 서류 작성",
+    term: "AI 소장/내용증명 생성",
+    definition: "AI와 대화하며 질문에 답하기만 하세요. 논리적이고 설득력 있는 소장이나 내용증명 초안이 즉시 완성됩니다.",
+    tip: "수백만 건의 법률 데이터를 학습한 AI가 당신에게 가장 유리한 법리적 근거와 문장을 제안합니다.",
     icon: <BookOpen className="w-12 h-12 text-indigo-600" />
   },
   {
-    title: "강력한 경고장",
-    term: "내용증명 (Demand Letter)",
-    definition: "소송 전, 상대방에게 내 요구사항을 공식적으로 전달했다는 사실을 우체국이 증명해주는 문서입니다.",
-    tip: "내용증명만으로도 문제가 해결되는 경우가 많으니 소송 전 꼭 검토해 보세요.",
+    title: "Step 3. 증거 정리",
+    term: "빈틈없는 증거 목록화",
+    definition: "사진, 영수증, 대화 캡처본을 업로드하세요. AI가 증거 번호를 부여하고 증거설명서 초안을 자동으로 작성해 드립니다.",
+    tip: "어떤 증거가 승소에 결정적인 역할을 할지 AI가 분석하여 우선순위를 추천해 드립니다.",
     icon: <ShieldCheck className="w-12 h-12 text-emerald-600" />
   },
   {
-    title: "법원의 피드백",
-    term: "보정명령 (Correction Order)",
-    definition: "법원이 제출된 서류를 보고 '이 부분은 부족하니 고쳐오세요'라고 내리는 지시입니다.",
-    tip: "당황하지 마세요! 보정명령서를 SoloLaw에 업로드하면 어떻게 고쳐야 할지 바로 알려드립니다.",
+    title: "Step 4. 법원 대응",
+    term: "보정명령 대응 가이드",
+    definition: "법원에서 온 보정명령서를 업로드하면, AI가 무엇을 수정해야 하는지 분석하고 답변서 초안을 만들어 드립니다.",
+    tip: "어려운 법원의 지시사항을 알기 쉽게 풀어서 설명해 드리니 당황하지 마세요.",
     icon: <Sparkles className="w-12 h-12 text-amber-600" />
+  },
+  {
+    title: "Step 5. 전문가 검토",
+    term: "변호사 최종 검토 연계",
+    definition: "AI가 작성한 서류를 실제 파트너 변호사에게 검토받으세요. 법적 완성도를 100%로 끌어올려 승소 확률을 높입니다.",
+    tip: "AI로 준비 비용은 낮추고, 변호사의 전문성으로 신뢰는 높였습니다. 마지막 한 걸음까지 함께합니다.",
+    icon: <CheckCircle2 className="w-12 h-12 text-brand-600" />
   }
 ];
 

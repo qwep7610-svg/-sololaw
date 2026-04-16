@@ -237,7 +237,7 @@ export const BrandingSettings: React.FC = () => {
               <Palette className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#0F172A] font-serif">앱 브랜딩 관리</h3>
+              <h2 className="text-xl font-bold text-[#0F172A] font-serif">플랫폼 브랜드 및 아이덴티티 설정</h2>
               <p className="text-sm text-slate-500 mt-1">플랫폼 전체의 로고, 명칭, 테마 컬러를 설정합니다.</p>
             </div>
           </div>
@@ -321,11 +321,11 @@ export const BrandingSettings: React.FC = () => {
           {/* Hero Section Settings */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-brand-600" /> 메인 히어로 섹션 설정
+          <Sparkles className="w-5 h-5 text-brand-600" /> 홈페이지 히어로 영역 설정
         </h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">메인 타이틀</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">헤드라인 문구</label>
             <textarea 
               value={config.heroTitle || ''}
               onChange={(e) => setConfig({ ...config, heroTitle: e.target.value })}
@@ -368,7 +368,7 @@ export const BrandingSettings: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">상세 설명</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">서브 헤드라인 문구</label>
             <textarea 
               value={config.heroDescription || ''}
               onChange={(e) => setConfig({ ...config, heroDescription: e.target.value })}
@@ -415,12 +415,12 @@ export const BrandingSettings: React.FC = () => {
       {/* About Us Section Settings */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <Info className="w-5 h-5 text-brand-600" /> 회사 소개 (About Us) 설정
+          <Info className="w-5 h-5 text-brand-600" /> 브랜드 스토리 및 미션 설정
         </h3>
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">회사 소개 히어로 타이틀</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">브랜드 스토리 헤드라인</label>
               <textarea 
                 value={config.aboutHeroTitle || ''}
                 onChange={(e) => setConfig({ ...config, aboutHeroTitle: e.target.value })}
@@ -429,7 +429,7 @@ export const BrandingSettings: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">회사 소개 히어로 설명</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">브랜드 스토리 상세 설명</label>
               <textarea 
                 value={config.aboutHeroDescription || ''}
                 onChange={(e) => setConfig({ ...config, aboutHeroDescription: e.target.value })}
@@ -476,7 +476,7 @@ export const BrandingSettings: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-brand-600" /> 주요 서비스 설정
+            <Wrench className="w-5 h-5 text-brand-600" /> 핵심 서비스 라인업 관리
           </h3>
           <button 
             onClick={handleAddService}
@@ -540,7 +540,7 @@ export const BrandingSettings: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Gem className="w-5 h-5 text-brand-600" /> 핵심 가치 설정
+            <Gem className="w-5 h-5 text-brand-600" /> 브랜드 핵심 가치 관리
           </h3>
           <button 
             onClick={handleAddValue}
