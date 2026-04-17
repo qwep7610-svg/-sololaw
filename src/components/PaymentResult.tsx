@@ -57,7 +57,7 @@ export default function PaymentResult({ type, onNavigate }: PaymentResultProps) 
             billingKey,
             amount,
             customerKey: lawyerId,
-            orderName: `솔로로 파트너십 ${planName} 광고료`
+            orderName: `SoloLaw Partnership ${planName} 광고료`
           })
         });
 

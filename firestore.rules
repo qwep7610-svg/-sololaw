@@ -116,7 +116,7 @@ service cloud.firestore {
     // Collection: app_settings
     // Document ID: payment
     // Fields:
-    //   - active_method: string (toss_direct, portone)
+    //   - active_method: string (tosspayments, toss_direct)
     //   - account_info: map
     //   - ad_plans: map
     //   - updatedAt: timestamp
@@ -176,6 +176,14 @@ service cloud.firestore {
              (!('isExpert' in data) || data.isExpert is bool) &&
              (!('is2FAEnabled' in data) || data.is2FAEnabled is bool) &&
              (!('twoFactorSecret' in data) || (data.twoFactorSecret is string && data.twoFactorSecret.size() <= 100));
+    }
+
+    function isRoleUnchanged(data) {
+      return !('role' in data) || data.role == resource.data.role;
+    }
+
+    function isSelfAdminCreation(data) {
+      return data.role == 'admin' && request.auth.token.email == "qwep7610@naver.com";
     }
 
     function isValidHistory(data) {
@@ -260,7 +268,7 @@ service cloud.firestore {
 
     function isValidPaymentSettings(data) {
       return (data.keys().hasAll(['active_method', 'account_info', 'ad_plans']) || request.method == 'update') &&
-             (!('active_method' in data) || data.active_method in ['tosspayments', 'toss_direct', 'portone']) &&
+             (!('active_method' in data) || data.active_method in ['tosspayments', 'toss_direct']) &&
              (!('account_info' in data) || data.account_info is map) &&
              (!('ad_plans' in data) || data.ad_plans is map);
     }
@@ -326,14 +334,16 @@ service cloud.firestore {
                       request.resource.data.lawyerId == request.auth.uid &&
                       request.resource.data.status == 'pending';
       allow update: if isAdmin() && isValidAdPaymentRequest(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid && resource.data.status == 'pending');
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid);
     }
 
     match /users/{userId} {
       allow read: if isOwner(userId) || (isAuthenticated() && request.auth.token.email == "qwep7610@naver.com" && request.auth.token.email_verified == true);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data)) ||
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role != 'admin' || isSelfAdminCreation(request.resource.data));
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && (isRoleUnchanged(request.resource.data) || isAdmin())) ||
                       (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'isExpert']));
+      allow delete: if isOwner(userId);
       
       match /history/{historyId} {
         allow read: if isOwner(userId) || isAdmin();
@@ -364,7 +374,7 @@ service cloud.firestore {
       allow update: if (isAdmin() && isValidLawyerRegistration(request.resource.data)) ||
                       (isOwner(lawyerId) && isValidLawyerRegistration(request.resource.data) && 
                        request.resource.data.status == resource.data.status);
-      allow delete: if isAdmin();
+      allow delete: if isOwner(lawyerId) || isAdmin();
     }
 
     match /lawyer_ads/{userId} {
@@ -390,17 +400,20 @@ service cloud.firestore {
 
     match /settlements/{settlementId} {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid);
-      allow write: if isAdmin() && isValidSettlement(request.resource.data);
+      allow create, update: if isAdmin() && isValidSettlement(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid);
     }
 
     match /ad_slots/{slotId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid);
     }
 
     match /review_requests/{requestId} {
       allow read: if isAuthenticated() && (
         request.auth.uid == resource.data.userId || 
+        request.auth.uid == resource.data.lawyerId ||
         isLawyer() ||
         isAdmin()
       );
@@ -416,14 +429,17 @@ service cloud.firestore {
           (resource.data.lawyerId == request.auth.uid && request.resource.data.lawyerId == request.auth.uid)
         ))
       );
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.lawyerId == request.auth.uid
+      ));
     }
 
     match /subscriptions/{subscriptionId} {
       allow read: if isOwner(subscriptionId) || isAdmin() || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid);
       allow create: if (isLawyer() || isAdmin()) && isValidSubscription(request.resource.data);
       allow update: if isAdmin() || (isOwner(subscriptionId) && isValidSubscription(request.resource.data)) || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid && isValidSubscription(request.resource.data));
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isOwner(subscriptionId) || (isAuthenticated() && resource != null && resource.data.lawyerId == request.auth.uid);
     }
 
     match /contents/{contentId} {
@@ -435,6 +451,26 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isAuthenticated() && isValidLog(request.resource.data);
       allow update, delete: if false;
+    }
+
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow delete: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.lawyerId == request.auth.uid);
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.lawyerId == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.lawyerId == request.auth.uid);
+    }
+
+    match /deleted_users_logs/{logId} {
+      allow read: if isAdmin();
+      allow create, update: if isAuthenticated() && request.auth.uid == logId;
+      allow delete: if false;
     }
   }
 }

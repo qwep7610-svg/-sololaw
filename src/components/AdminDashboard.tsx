@@ -1738,7 +1738,7 @@ export default function AdminDashboard() {
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
                             sub.planType === 'partnership' ? 'bg-brand-100 text-brand-600' : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {sub.planType === 'partnership' ? '파트너십' : '미가입'}
+                            {sub.planType === 'partnership' ? 'SoloLaw Partnership' : '미가입'}
                           </span>
                         </td>
                         <td className="p-6 whitespace-nowrap">
@@ -1853,7 +1853,7 @@ export default function AdminDashboard() {
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">활성 결제 수단</p>
                   <p className="text-sm font-bold text-slate-700">
                     {paymentSettings?.active_method === 'tosspayments' ? '토스페이먼츠 정기 결제 (Billing)' : 
-                     paymentSettings?.active_method === 'toss_direct' ? '토스 직접 송금 (App-in-Toss)' : 'PortOne 정기 결제'}
+                     paymentSettings?.active_method === 'toss_direct' ? '토스 직접 송금 (App-in-Toss)' : '토스페이먼츠 정기 결제'}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -1904,7 +1904,7 @@ export default function AdminDashboard() {
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
                             req.planType === 'partnership' ? 'bg-brand-100 text-brand-600' : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {req.planType === 'partnership' ? '파트너십' : '미가입'}
+                            {req.planType === 'partnership' ? 'SoloLaw Partnership' : '미가입'}
                           </span>
                         </td>
                         <td className="p-6 font-bold text-brand-600 whitespace-nowrap">{req.amount?.toLocaleString()}원</td>
@@ -2063,7 +2063,6 @@ export default function AdminDashboard() {
                   >
                     <option value="tosspayments">토스페이먼츠 정기 결제 (Billing)</option>
                     <option value="toss_direct">토스 직접 송금 (App-in-Toss)</option>
-                    <option value="portone">PortOne 정기 결제</option>
                   </select>
                 </div>
 
@@ -2114,7 +2113,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">광고 플랜 가격 (원)</label>
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <span className="text-[10px] text-slate-400 block mb-1">파트너십</span>
+                      <span className="text-[10px] text-slate-400 block mb-1">SoloLaw Partnership</span>
                       <input 
                         type="number"
                         value={editPayForm.ad_plans?.partnership}
@@ -2602,7 +2601,7 @@ export default function AdminDashboard() {
                     onChange={(e) => setSubEditForm({ ...subEditForm, planType: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
                   >
-                    <option value="partnership">파트너십</option>
+                    <option value="partnership">SoloLaw Partnership</option>
                     <option value="basic">베이직</option>
                     <option value="standard">스탠다드</option>
                     <option value="premium">프리미엄</option>

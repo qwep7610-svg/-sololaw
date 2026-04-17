@@ -45,7 +45,7 @@ export default function AdPreview({ planType, lawyerInfo }: PreviewProps) {
             {/* Ad Card */}
             <div className="relative p-5 rounded-[2rem] border-2 border-brand-500 bg-white shadow-[0_20px_50px_rgba(37,99,235,0.15)] scale-[1.02] overflow-hidden">
               
-              {/* 파트너십 배경 효과 */}
+              {/* Partnership background effect */}
               <div className="absolute inset-0 pointer-events-none opacity-[0.03]">
                 <div className="absolute inset-0 bg-gradient-to-br from-brand-600 to-indigo-600" />
                 <div className="absolute top-0 left-0 w-full h-full" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, black 1px, transparent 0)', backgroundSize: '12px 12px' }} />
@@ -129,7 +129,7 @@ export default function AdPreview({ planType, lawyerInfo }: PreviewProps) {
             <Star className="w-5 h-5 text-brand-600" />
           </div>
           <div>
-            <h5 className="font-bold text-sm mb-1">솔로로 파트너십 혜택</h5>
+            <h5 className="font-bold text-sm mb-1">SoloLaw Partnership 혜택</h5>
             <p className="text-xs leading-relaxed opacity-80">
               ✨ 검색 결과 최상단 고정 노출 및 전용 배지가 부여됩니다. 특히 '직통 전화상담' 버튼을 통해 잠재 고객과의 연결성이 350% 이상 향상됩니다.
             </p>

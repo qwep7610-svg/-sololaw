@@ -275,7 +275,7 @@ export default function LawyerAdCard({ caseSummary }: { caseSummary: string }) {
             <div className="space-y-1">
               <h4 className="text-lg font-bold text-[#0F172A] font-serif">내 주변 변호사 맞춤 추천</h4>
               <p className="text-sm text-slate-500 font-medium">
-                지역을 선택하시면 해당 지역에서 활동 중인 <span className="text-brand-600 font-bold">SoloLaw 파트너 변호사</span>를 우선 추천해 드립니다.
+                지역을 선택하시면 해당 지역에서 활동 중인 <span className="text-brand-600 font-bold">SoloLaw Partner Lawyer</span>를 우선 추천해 드립니다.
               </p>
             </div>
           </div>
@@ -381,7 +381,7 @@ export default function LawyerAdCard({ caseSummary }: { caseSummary: string }) {
                       "👨‍⚖️"
                     )}
                     {lawyer.hasActiveSubscription && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 rounded-full flex items-center justify-center border-2 border-white shadow-sm z-10" title="SoloLaw 파트너 변호사">
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 rounded-full flex items-center justify-center border-2 border-white shadow-sm z-10" title="SoloLaw Partner Lawyer">
                         <ShieldCheck className="w-3 h-3 text-white" />
                       </div>
                     )}

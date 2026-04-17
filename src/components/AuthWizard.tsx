@@ -519,7 +519,7 @@ export default function AuthWizard({ onComplete, onBack, initialType }: {
                     <div className="space-y-1">
                       <p className="text-sm font-bold text-slate-800">광고 모델 및 법적 고지 동의 (필수)</p>
                       <p className="text-[11px] text-slate-500 leading-relaxed">
-                        본 서비스의 변호사 노출은 '단순 유료 광고' 모델이며, 사건 알선 수수료를 받지 않습니다. 변호사법을 준수하는 파트너십에 동의합니다.
+                        본 서비스의 변호사 노출은 '단순 유료 광고' 모델이며, 사건 알선 수수료를 받지 않습니다. 변호사법을 준수하는 Partnership에 동의합니다.
                       </p>
                     </div>
                   </label>

@@ -18,7 +18,7 @@ interface PaymentRecord {
 
 const PARTNERSHIP_PLAN = {
   id: 'partnership',
-  name: '솔로로 파트너십',
+  name: 'SoloLaw Partnership',
   price: 99000,
   features: [
     'AI 사건 요약 리포트 제공',
@@ -92,7 +92,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
             amount: 55000,
             date: { seconds: Date.now() / 1000 - 86400 * 15 },
             status: 'completed',
-            planName: '솔로로 파트너십'
+            planName: 'SoloLaw Partnership'
           });
         }
         
@@ -381,7 +381,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div className="space-y-2">
-                <h4 className="text-xl font-bold font-serif">파트너십 혜택</h4>
+                <h4 className="text-xl font-bold font-serif">Partnership Benefits</h4>
                 <p className="text-brand-50 text-xs leading-relaxed font-medium">
                   SoloLaw 파트너 변호사가 되시면 AI 기반의 맞춤형 광고와 지역 타겟팅을 통해 더 많은 의뢰인을 만날 수 있습니다.
                 </p>
@@ -497,7 +497,7 @@ export default function SubscriptionManager({ onBack }: { onBack: () => void }) 
                     onSubscribe={() => {
                       const partnershipPlan = {
                         id: 'partnership',
-                        name: '솔로로 파트너십',
+                        name: 'SoloLaw Partnership',
                         price: paymentSettings?.ad_plans?.partnership || 99000
                       };
                       handleUpgrade(partnershipPlan);

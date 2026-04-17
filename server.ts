@@ -89,7 +89,7 @@ async function startServer() {
           customerKey,
           amount,
           orderId: `SOLO_AD_${Date.now()}`,
-          orderName: orderName || "솔로로 파트너십 정액 광고료"
+          orderName: orderName || "SoloLaw Partnership 정액 광고료"
         },
         {
           headers: {
@@ -106,38 +106,31 @@ async function startServer() {
     }
   });
 
-  // PortOne Billing Key Save API
-  app.post("/api/subscriptions/billing-key", async (req, res) => {
-    const { lawyerId, customer_uid, planType, amount } = req.body;
-    
-    if (!lawyerId || !customer_uid) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+  // Toss Payments: Cancel subscription/billing key (Placeholder)
+  app.post("/api/toss/cancel-subscription", async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
 
     try {
-      const nextBillingDate = new Date();
-      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+      // Find the subscription for this user
+      const subRef = db.collection("subscriptions").doc(userId);
+      const subDoc = await subRef.get();
 
-      await db.collection("subscriptions").doc(lawyerId).set({
-        lawyerId,
-        billingKey: customer_uid,
-        planType,
-        amount,
-        nextBillingDate: admin.firestore.Timestamp.fromDate(nextBillingDate),
-        status: "active",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      if (subDoc.exists) {
+        // Mark as inactive in DB
+        await subRef.update({
+          status: "inactive",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // In real Toss Payments, you might want to call an API if you have recurring schedules managed by Toss
+        // But for billing-key based payments (like we do in the scheduler), 
+        // simply making it inactive in our DB stops the payments.
+      }
 
-      // Update lawyer registration status
-      await db.collection("lawyers").doc(lawyerId).update({
-        hasActiveSubscription: true,
-        subscriptionPlan: planType
-      });
-
-      res.json({ success: true });
+      res.json({ success: true, message: "Subscription cancelled successfully" });
     } catch (error) {
-      console.error("Failed to save billing key:", error);
+      console.error("Cancel Subscription Error:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
@@ -165,7 +158,7 @@ async function startServer() {
           console.log(`Processing payment for lawyer: ${sub.lawyerId} (${sub.planType})`);
           
           // 1. Determine PG provider and process payment
-          if (sub.billingKey.startsWith('toss_')) {
+          if (sub.billingKey && sub.billingKey.startsWith('toss_')) {
             // Toss Payments logic
             const secretKey = process.env.TOSS_SECRET_KEY;
             if (!secretKey) throw new Error("TOSS_SECRET_KEY is not configured");
@@ -177,7 +170,7 @@ async function startServer() {
                 customerKey: sub.lawyerId,
                 amount: sub.amount,
                 orderId: `SOLO_AD_${sub.lawyerId}_${Date.now()}`,
-                orderName: `SoloLaw 변호사 정액제 광고 (${sub.planType})`
+                orderName: `SoloLaw Partnership Ad (${sub.planType})`
               },
               {
                 headers: {
@@ -189,25 +182,8 @@ async function startServer() {
             
             if (payRes.status !== 200) throw new Error("Toss Payment failed");
           } else {
-            // PortOne logic (Mocked for now as per original code)
-            /* 
-            const tokenRes = await axios.post('https://api.iamport.kr/users/getToken', {
-              imp_key: process.env.PORTONE_API_KEY,
-              imp_secret: process.env.PORTONE_API_SECRET
-            });
-            const accessToken = tokenRes.data.response.access_token;
-
-            const payRes = await axios.post('https://api.iamport.kr/subscribe/payments/again', {
-              customer_uid: sub.billingKey,
-              merchant_uid: `sub_${sub.lawyerId}_${Date.now()}`,
-              amount: sub.amount,
-              name: `SoloLaw 변호사 정액제 광고 (${sub.planType})`
-            }, {
-              headers: { Authorization: accessToken }
-            });
-
-            if (payRes.data.code !== 0) throw new Error(payRes.data.message);
-            */
+            console.log(`Skipping payment for lawyer ${sub.lawyerId}: Billing key not supported or missing.`);
+            continue; // Skip unsupported providers
           }
 
           // Simulate successful payment for logic flow

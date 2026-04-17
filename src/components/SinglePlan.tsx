@@ -22,7 +22,7 @@ export default function SinglePlanCard({ onSubscribe, price = 99000 }: SinglePla
           <div className="inline-flex items-center gap-2 bg-brand-500 px-4 py-1 rounded-full text-xs font-black mb-4">
             <Zap className="w-3 h-3 fill-white" /> BEST VALUE
           </div>
-          <h2 className="text-2xl font-black mb-2">솔로로 파트너십</h2>
+          <h2 className="text-2xl font-black mb-2">SoloLaw Partnership</h2>
           <div className="flex items-baseline justify-center gap-1">
             <span className="text-4xl font-black">{price.toLocaleString()}</span>
             <span className="text-lg opacity-80">원 / 월</span>
@@ -48,7 +48,7 @@ export default function SinglePlanCard({ onSubscribe, price = 99000 }: SinglePla
             onClick={onSubscribe}
             className="w-full py-5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-lg transition-all shadow-xl shadow-slate-200 mt-4 active:scale-95"
           >
-            파트너십 시작하기
+            Get Started
           </button>
           
           <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400 mt-6 font-medium">

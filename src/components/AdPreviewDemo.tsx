@@ -84,7 +84,7 @@ export default function AdPreviewDemo({ onBack }: AdPreviewDemoProps) {
                       </div>
                       <span className="text-lg font-bold text-slate-900">월 {(paymentSettings?.ad_plans?.partnership || 99000).toLocaleString()}원</span>
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800">솔로로 파트너십</h3>
+                    <h3 className="text-lg font-bold text-slate-800">SoloLaw Partnership</h3>
                     <p className="text-sm text-slate-500 mt-1">최상단 고정 노출, 강조 UI, 직통 전화 버튼 및 공식 파트너 배지 제공</p>
                   </div>
                 </div>

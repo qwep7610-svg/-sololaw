@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, Lock, Smartphone, ArrowLeft, Check, AlertCircle, Loader2, KeyRound, Trash2 } from 'lucide-react';
+import { ShieldCheck, Lock, Smartphone, ArrowLeft, Check, AlertCircle, Loader2, KeyRound, Trash2, UserX } from 'lucide-react';
 import { db, auth, doc, updateDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
+import WithdrawalPage from './Withdrawal.tsx';
 
 export default function SecuritySettings({ onBack }: { onBack: () => void }) {
-  const { user } = useAuth();
+  const { user, deleteAccount } = useAuth();
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
+  const [showWithdrawal, setShowWithdrawal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,42 +83,47 @@ export default function SecuritySettings({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const handleDeleteAllData = async () => {
-    if (!user) return;
-    
-    const confirmed = confirm('정말로 모든 데이터를 삭제하시겠습니까? 작성된 문서, 증거 사진, 분석 결과 등 모든 정보가 영구적으로 삭제되며 복구할 수 없습니다.');
-    if (!confirmed) return;
-
-    const secondConfirmed = confirm('마지막 확인입니다. 정말로 삭제하시겠습니까?');
-    if (!secondConfirmed) return;
-
-    setIsSaving(true);
-    try {
-      const batch = writeBatch(db);
-      
-      // 1. Delete lawyer profile
-      batch.delete(doc(db, 'lawyer_profiles', user.uid));
-
-      // 2. Delete complaints
-      const complaintsQuery = query(collection(db, 'complaints'), where('userId', '==', user.uid));
-      const complaintsSnap = await getDocs(complaintsQuery);
-      complaintsSnap.forEach(d => batch.delete(d.ref));
-
-      // 3. Delete history
-      const historyQuery = query(collection(db, 'lawyer_profile_history'), where('userId', '==', user.uid));
-      const historySnap = await getDocs(historyQuery);
-      historySnap.forEach(d => batch.delete(d.ref));
-
-      await batch.commit();
-      setErrorMsg('모든 데이터가 성공적으로 삭제되었습니다.');
-      onBack();
-    } catch (error) {
-      console.error("Error deleting all data:", error);
-      setErrorMsg('데이터 삭제 중 오류가 발생했습니다.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  if (showWithdrawal) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        {errorMsg && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800">알림</h3>
+                <p className="text-sm text-slate-600">{errorMsg}</p>
+                <button 
+                  onClick={() => setErrorMsg(null)}
+                  className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <WithdrawalPage 
+          onBack={() => setShowWithdrawal(false)}
+          onConfirm={async () => {
+            setIsSaving(true);
+            try {
+              await deleteAccount();
+              // AuthContext will update user to null, ProtectedRoute/App will handle redirection
+            } catch (error: any) {
+              console.error("Withdrawal error:", error);
+              setErrorMsg(error.message || '회원 탈퇴 중 오류가 발생했습니다.');
+            } finally {
+              setIsSaving(false);
+            }
+          }}
+          isLoading={isSaving}
+        />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -262,24 +269,24 @@ export default function SecuritySettings({ onBack }: { onBack: () => void }) {
 
           <div className="p-6 rounded-2xl bg-red-50 border border-red-100 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex gap-4">
-              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0">
-                <Trash2 className="w-6 h-6 text-red-600" />
+              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0 text-red-600">
+                <UserX className="w-6 h-6" />
               </div>
               <div>
-                <p className="font-bold text-red-900">모든 데이터 즉시 삭제</p>
+                <p className="font-bold text-red-900">회원 탈퇴</p>
                 <p className="text-xs text-red-800 mt-1 leading-relaxed">
-                  작성했던 모든 문서와 증거 사진을 서버에서 완전히 삭제합니다.<br />
-                  삭제된 데이터는 복구가 불가능합니다.
+                  계정 및 모든 데이터를 영구적으로 파기합니다.<br />
+                  탈퇴 시 복구가 불가능하니 신중히 결정해 주세요.
                 </p>
               </div>
             </div>
             <button
-              onClick={handleDeleteAllData}
+              onClick={() => setShowWithdrawal(true)}
               disabled={isSaving}
               className="w-full sm:w-auto px-6 py-3 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-100 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              전체 데이터 삭제
+              회원 탈퇴하기
             </button>
           </div>
         </div>

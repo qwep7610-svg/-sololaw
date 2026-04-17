@@ -180,7 +180,7 @@
       "type": "object",
       "properties": {
         "lawyerId": { "type": "string" },
-        "billingKey": { "type": "string", "description": "customer_uid for PortOne" },
+        "billingKey": { "type": "string", "description": "customer_uid for Payment Provider (e.g., Toss)" },
         "planType": { "type": "string", "enum": ["basic", "standard", "premium"] },
         "amount": { "type": "number" },
         "nextBillingDate": { "type": "string", "format": "date-time" },
@@ -241,7 +241,7 @@
       "description": "Configuration for Toss Direct and other payment methods",
       "type": "object",
       "properties": {
-        "active_method": { "type": "string", "enum": ["toss_direct", "portone"] },
+        "active_method": { "type": "string", "enum": ["tosspayments", "toss_direct"] },
         "account_info": {
           "type": "object",
           "properties": {

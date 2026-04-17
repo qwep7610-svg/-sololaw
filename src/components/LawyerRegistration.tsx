@@ -868,7 +868,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#0F172A]">SoloLaw 파트너십 광고 플랜</h3>
+              <h3 className="text-lg font-bold text-[#0F172A]">SoloLaw Partnership Ad Plan</h3>
               <p className="text-xs text-slate-500">정액제 광고로 더 많은 의뢰인을 만나보세요.</p>
             </div>
             <button 
@@ -885,7 +885,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
                 <div className="space-y-1">
                   <p className="text-xs text-brand-600 font-bold uppercase tracking-wider">현재 이용 중인 플랜</p>
                   <h4 className="text-xl font-bold text-brand-900">
-                    {(currentSubscription?.planType || profile.adPlan || pendingRequest?.planType) === 'partnership' ? '솔로로 파트너십' : '미가입'}
+                    {(currentSubscription?.planType || profile.adPlan || pendingRequest?.planType) === 'partnership' ? 'SoloLaw Partnership' : '미가입'}
                   </h4>
                 </div>
                 <div className="px-3 py-1 bg-brand-600 text-white text-[10px] font-bold rounded-full">
@@ -926,7 +926,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
                 <div className="space-y-1">
                   <p className="text-xs text-amber-600 font-bold uppercase tracking-wider">입금 확인 대기 중</p>
                   <h4 className="text-xl font-bold text-amber-900">
-                    {pendingRequest.planType === 'partnership' ? '솔로로 파트너십' : '미가입'}
+                    {pendingRequest.planType === 'partnership' ? 'SoloLaw Partnership' : '미가입'}
                   </h4>
                 </div>
                 <div className="px-3 py-1 bg-amber-500 text-white text-[10px] font-bold rounded-full animate-pulse">
@@ -959,7 +959,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
                 <div className="space-y-1">
                   <p className="text-xs text-red-600 font-bold uppercase tracking-wider">입금 확인 반려됨</p>
                   <h4 className="text-xl font-bold text-red-900">
-                    {pendingRequest.planType === 'partnership' ? '솔로로 파트너십' : '미가입'}
+                    {pendingRequest.planType === 'partnership' ? 'SoloLaw Partnership' : '미가입'}
                   </h4>
                 </div>
                 <div className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold rounded-full">
@@ -982,7 +982,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
           ) : (
             <div className="space-y-8">
               <div className="text-center space-y-2">
-                <h3 className="text-2xl font-black text-slate-900">솔로로 파트너십</h3>
+                <h3 className="text-2xl font-black text-slate-900">SoloLaw Partnership</h3>
                 <p className="text-slate-500">변호사님의 전문성을 가장 효과적으로 전달하는 단 하나의 플랜</p>
               </div>
               
@@ -1138,7 +1138,7 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
             <div className="p-2 bg-brand-800 rounded-xl">
               <ShieldCheck className="w-5 h-5 text-brand-400" />
             </div>
-            <h3 className="text-lg font-bold">SoloLaw 파트너십 안내 (정액제 광고 상품)</h3>
+            <h3 className="text-lg font-bold">SoloLaw Partnership Info (Flat-rate Ad)</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
