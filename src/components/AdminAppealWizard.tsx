@@ -7,6 +7,7 @@ import { useAuth } from '../lib/AuthContext';
 import { saveToHistory } from '../services/historyService';
 import StepIndicator from './StepIndicator';
 import AIAssistantBubble from './AIAssistantBubble';
+import FinalReviewModal from './FinalReviewModal';
 
 interface AdminNoticeAnalysis {
   noticeDate: string;
@@ -25,6 +26,7 @@ export default function AdminAppealWizard({ onBack }: { onBack: () => void }) {
   const [isSaved, setIsSaved] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showFinalReview, setShowFinalReview] = useState(false);
 
   const [formData, setFormData] = useState({
     appellant: '',
@@ -427,7 +429,7 @@ export default function AdminAppealWizard({ onBack }: { onBack: () => void }) {
                 이전으로
               </button>
               <button 
-                onClick={handleGenerate}
+                onClick={() => setShowFinalReview(true)}
                 disabled={isLoading}
                 className="flex-[2] bg-[#2563EB] text-white py-4 rounded-xl font-bold hover:bg-[#1D4ED8] transition-all flex items-center justify-center gap-2"
               >
@@ -436,6 +438,16 @@ export default function AdminAppealWizard({ onBack }: { onBack: () => void }) {
               </button>
             </div>
           </motion.div>
+        )}
+
+        {showFinalReview && (
+          <FinalReviewModal 
+            onConfirm={() => {
+              setShowFinalReview(false);
+              handleGenerate();
+            }}
+            onCancel={() => setShowFinalReview(false)}
+          />
         )}
 
         {step === 3 && result && (

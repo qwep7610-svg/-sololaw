@@ -7,6 +7,7 @@ import { useAuth } from '../lib/AuthContext';
 import { saveToHistory } from '../services/historyService';
 import StepIndicator from './StepIndicator';
 import AIAssistantBubble from './AIAssistantBubble';
+import AIResultViewer from './AIResultViewer';
 
 interface SelectedFile {
   name: string;
@@ -421,10 +422,10 @@ export default function DocumentSummarizer({ onBack }: { onBack: () => void }) {
                     </button>
                   </div>
                 </div>
-                <div className="p-4 md:p-8 flex-1 overflow-y-auto prose prose-slate max-w-none break-words">
-                  <ReactMarkdown>{result}</ReactMarkdown>
+                <div className="p-4 md:p-8 flex-1 overflow-y-auto break-words">
+                  <AIResultViewer content={result} type="summary" />
                 </div>
-                <div className="p-6 bg-blue-50 border-t border-blue-100">
+                <div className="p-6 bg-blue-50 border-t border-blue-100 space-y-4">
                   <div className="flex gap-3">
                     <AlertCircle className="w-5 h-5 text-blue-600 shrink-0" />
                     <p className="text-xs text-blue-700 leading-relaxed">
@@ -432,6 +433,28 @@ export default function DocumentSummarizer({ onBack }: { onBack: () => void }) {
                       중요한 결정 전에는 반드시 원문 전체를 꼼꼼히 확인하시기 바랍니다.
                     </p>
                   </div>
+                  
+                  <button
+                    onClick={handleSaveToHistory}
+                    disabled={isSaved}
+                    className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md ${
+                      isSaved 
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
+                        : 'bg-white border border-blue-200 text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    {isSaved ? (
+                      <>
+                        <Check className="w-5 h-5" />
+                        보관함에 저장되었습니다
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-5 h-5" />
+                        내 보관함에 저장하기
+                      </>
+                    )}
+                  </button>
                 </div>
               </motion.div>
             )}

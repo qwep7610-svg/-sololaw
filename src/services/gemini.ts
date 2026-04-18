@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Simple in-memory cache to reduce redundant API calls
 const apiCache = new Map<string, { result: any; timestamp: number }>();
@@ -10,8 +10,32 @@ async function withRetry<T>(
   modelName: string,
   params: any,
   cacheKey?: string,
-  maxRetries = 12
+  maxRetries = 12,
+  userId?: string
 ): Promise<any> {
+  // 1. Enforce App-level User Quota if userId is provided
+  if (userId) {
+    try {
+      const quotaRes = await fetch("/api/usage/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId })
+      });
+      
+      if (quotaRes.status === 429) {
+        const errorData = await quotaRes.json();
+        throw new Error(errorData.message || "일일 AI 사용량을 초과했습니다.");
+      }
+      
+      if (!quotaRes.ok) {
+        console.warn("Usage tracking failed, but allowing request to proceed.");
+      }
+    } catch (e: any) {
+      if (e.message.includes("사용량")) throw e;
+      console.error("Quota check side-error:", e);
+    }
+  }
+
   if (cacheKey) {
     const cached = apiCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -23,40 +47,38 @@ async function withRetry<T>(
   let currentModel = modelName;
   
   // Map to standard model aliases supported by the platform
-  if (currentModel.includes("gemini-1.5-pro") || currentModel.includes("gemini-3.1-pro")) {
-    currentModel = "gemini-1.5-pro";
-  } else if (currentModel.includes("gemini-1.5-flash-8b") || currentModel.includes("gemini-3.1-flash-lite")) {
-    currentModel = "gemini-1.5-flash";
-  } else if (currentModel.includes("gemini-1.5-flash") || currentModel.includes("gemini-3")) {
-    currentModel = "gemini-1.5-flash";
+  if (currentModel.includes("pro")) {
+    currentModel = "gemini-3.1-pro-preview";
+  } else {
+    currentModel = "gemini-3-flash-preview";
   }
 
   for (let i = 0; i < maxRetries; i++) {
     try {
       // Fallback logic to bypass potential rate limits
       if (i >= 4) {
-        if (currentModel === "gemini-1.5-pro") {
-          currentModel = "gemini-1.5-flash";
+        if (currentModel === "gemini-3.1-pro-preview") {
+          currentModel = "gemini-3-flash-preview";
           console.warn(`Switching to fallback model: ${currentModel} (from Pro) due to persistent rate limits.`);
         }
       }
 
-      const model = ai.getGenerativeModel({ model: currentModel });
-      
-      // Normalize params for the official SDK
-      let requestParams = params;
-      if (typeof params === 'object' && params.contents && typeof params.contents === 'string') {
-        requestParams = params.contents;
+      // Normalize params for the official SDK @google/genai
+      let contents = params;
+      if (typeof params === 'object' && params.contents) {
+        contents = params.contents;
       }
 
-      const result = await model.generateContent(requestParams);
-      const response = await result.response;
-      const text = response.text();
+      const result = await ai.models.generateContent({
+        model: currentModel,
+        contents: contents
+      });
+
+      const text = result.text || "";
 
       const finalResult = {
         ...result,
         text: text,
-        response: response
       };
 
       if (cacheKey) {
@@ -96,8 +118,8 @@ async function withRetry<T>(
   throw lastError;
 }
 
-async function safeGenerate(model: string, params: any, cacheKey?: string) {
-  return withRetry(model, params, cacheKey);
+async function safeGenerate(model: string, params: any, cacheKey?: string, userId?: string) {
+  return withRetry(model, params, cacheKey, 12, userId);
 }
 
 export async function generateComplaint(data: {
@@ -106,7 +128,7 @@ export async function generateComplaint(data: {
   summary: string;
   amount: string;
   evidence: string;
-}) {
+}, userId?: string) {
   const prompt = `
 [Role]
 당신은 대한민국 민사소송 전문 법률 비서입니다. 사용자의 일상적인 언어를 법률적인 용어로 재구성하여 법원에 제출 가능한 수준의 소장 초안을 작성합니다.
@@ -134,9 +156,9 @@ export async function generateComplaint(data: {
 마지막에 '### 💡 SoloLaw 소송 팁' 섹션을 추가하여 해당 소송에서 유의할 점을 조언하세요.
 `;
 
-  const response = await safeGenerate("gemini-1.5-flash", {
+  const response = await safeGenerate("gemini-3-flash-preview", {
     contents: prompt,
-  });
+  }, undefined, userId);
 
   return response.text;
 }
@@ -171,7 +193,7 @@ ${story}
   }
 }
 
-export async function summarizeDocument(input: { text?: string; file?: { data: string; mimeType: string } }) {
+export async function summarizeDocument(input: { text?: string; file?: { data: string; mimeType: string } }, userId?: string) {
   const prompt = `
 [Role]
 당신은 복잡한 법률 문서를 초등학생도 이해할 수 있게 설명해주는 '법률 문해력 도우미'입니다.
@@ -206,41 +228,49 @@ export async function summarizeDocument(input: { text?: string; file?: { data: s
 
   const response = await safeGenerate("gemini-3-flash-preview", {
     contents: { parts: contents },
-  });
+  }, undefined, userId);
 
   return response.text;
 }
 
-export async function analyzeCorrectionOrder(input: { text?: string; file?: { data: string; mimeType: string } }) {
+export async function analyzeCorrectionOrder(input: { text?: string; file?: { data: string; mimeType: string } }, userId?: string) {
   const prompt = `
 [Role]
-당신은 대한민국 법원의 '보정명령'을 분석하고 대응 방안을 제시하는 법률 실무 전문가입니다.
+당신은 대한민국 법원의 '보정명령'을 정밀 분석하고 실질적인 대응 방안을 제시하는 법률 실무 전문가이자 AI 법률 조력자입니다.
+사용자는 법원으로부터 서류 보완 지시(보정명령)를 받고 당황한 상태입니다. 
 
 [Context]
-사용자는 법원으로부터 보정명령(서류 보완 지시)을 받았습니다. 
-사용자가 업로드한 보정명령서(이미지, PDF 또는 텍스트)를 분석하여 사용자가 무엇을 해야 하는지 정확히 짚어주어야 합니다.
+사용자가 업로드한 보정명령서(이미지, PDF) 또는 직접 입력한 텍스트를 분석하여, 법원이 요구하는 정확한 '조치'와 '기한 내 대응 방법'을 안내해야 합니다.
 
 [Task Instructions]
-1. 보정 이유 분석: 법원이 지적한 문제점이 무엇인지 구체적으로 설명하세요. (예: 주소 불명, 인지대 미납, 증거 번호 누락 등)
-2. 필요한 조치: 사용자가 준비해야 할 서류나 수행해야 할 행동을 단계별로 안내하세요.
-3. 보정서 초안 작성: 법원에 제출할 '보정서' 또는 '주소보정서' 등의 초안을 법적 형식에 맞춰 작성해 주세요.
+1. 보정 이유 정밀 분석: 법원이 무엇을 문제삼고 있는지 전문 용어를 사용하여 명확히 설명하되, 사용자가 이해하기 쉽게 풀어서 설명하세요. (예: 당사자 특정 불충분, 소가 산정 오류, 주소 송달 불능 등)
+2. 필요한 조치 및 대응 방안: 사용자가 즉시 준비해야 할 서류(주민등록 초본, 사실조회 신청서 등)와 수행해야 할 구체적인 행동 단계를 제시하세요. 보정 기한(7일 등)을 반드시 확인하고 강조하세요.
+3. 법적 리스크 경고: 보정 명령을 이행하지 않을 경우 발생할 수 있는 불익(소장 각하, 재판 지연 등)을 안내하세요.
+4. 보정서 초안 자동 완성: 법원에 바로 제출할 수 있을 수준의 '보정서' 초안을 작성하여 마크다운 코드 블록으로 제공하세요.
 
 [Output Format]
+반드시 아래 형식을 유지하십시오.
+
 ## 🔍 보정 명령 분석 결과
-- **지적 사항**: [법원이 지적한 핵심 내용]
-- **원인**: [왜 이런 명령이 나왔는지에 대한 설명]
+- **법원의 지적 사항**: [법원이 지적한 핵심 내용]
+- **명령이 나온 원인**: [왜 이런 명령이 나왔는지 실제 법률 실무 관점에서의 설명]
+- **보정 기한**: [명령서에 명시된 기한, 없으면 '명령을 받은 날로부터 7일 이내'로 안내]
 
 ## 🛠️ 해결 방법 (Step-by-Step)
-1. [첫 번째 할 일]
-2. [두 번째 할 일]
+1. **[1단계 조치]**: [구체적인 설명]
+2. **[2단계 조치]**: [구체적인 설명]
+3. **[대응 소요 시간]**: [예상되는 준비 시간]
 
 ## 📝 보정서 초안
 \`\`\`
-[법적 형식에 맞는 보정서 내용]
+[사건번호, 당사자 정보, 보정 내용 등을 포함한 법적 형식의 보정서 초안]
 \`\`\`
 
+## 💡 전문가 팁
+[실무상 주의사항이나 더 빠른 해결을 위한 노하우 한 줄]
+
 [Tone]
-당황한 사용자를 안심시키며, 전문적이고 명확한 어조로 안내하세요.
+침착하고 든든한 조력자처럼 느껴지도록 상냥하면서도 단호하게 안내하세요.
 `;
 
   const contents: any[] = [{ text: prompt }];
@@ -260,7 +290,7 @@ export async function analyzeCorrectionOrder(input: { text?: string; file?: { da
 
   const response = await safeGenerate("gemini-3-flash-preview", {
     contents: { parts: contents },
-  });
+  }, undefined, userId);
 
   return response.text;
 }
@@ -935,7 +965,7 @@ export async function generateMatchingRecommendation(data: {
 특히 **${data.keywords.join(', ')}**와 관련된 이력이 풍부한 아래 파트너 변호사들의 정보를 객관적으로 확인해 보시기 바랍니다."
 `;
 
-  const response = await safeGenerate("gemini-1.5-flash", {
+  const response = await safeGenerate("gemini-3-flash-preview", {
     contents: prompt,
   });
 
@@ -1098,7 +1128,7 @@ JSON 형식으로 출력하세요. (마크다운 코드 블록 없이 순수 JSO
 }
 `;
 
-  const response = await safeGenerate("gemini-1.5-flash", {
+  const response = await safeGenerate("gemini-3-flash-preview", {
     contents: prompt,
   }, cacheKey);
 
@@ -1189,7 +1219,7 @@ JSON 형식으로 출력하세요. (마크다운 코드 블록 없이 순수 JSO
 }
 `;
 
-  const response = await safeGenerate("gemini-1.5-flash", {
+  const response = await safeGenerate("gemini-3-flash-preview", {
     contents: prompt,
   }, cacheKey);
 
@@ -1398,7 +1428,7 @@ JSON 형식으로 출력하세요. (마크다운 코드 블록 없이 순수 JSO
 }
 `;
 
-  const response = await safeGenerate("gemini-1.5-flash", {
+  const response = await safeGenerate("gemini-3-flash-preview", {
     contents: prompt,
   });
 
@@ -1445,7 +1475,7 @@ JSON 형식으로 출력하세요.
 }
 `;
 
-  const response = await safeGenerate("gemini-1.5-flash", {
+  const response = await safeGenerate("gemini-3-flash-preview", {
     contents: prompt,
   });
 

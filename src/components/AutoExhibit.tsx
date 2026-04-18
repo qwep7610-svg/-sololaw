@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, FileText, Loader2, Copy, Check, AlertCircle, Camera, Upload, X, File, ListOrdered, Save, Trash2, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import AIResultViewer from './AIResultViewer';
 import { analyzeExhibits } from '../services/gemini';
 import { useAuth } from '../lib/AuthContext';
 import { saveToHistory } from '../services/historyService';
@@ -368,8 +369,8 @@ export default function AutoExhibit({ onBack }: { onBack: () => void }) {
                     </button>
                   </div>
                 </div>
-                <div className="p-8 flex-1 overflow-y-auto prose prose-slate max-w-none prose-headings:text-[#0F172A] prose-headings:font-bold prose-p:text-[#475569] prose-p:leading-relaxed prose-table:text-sm">
-                  <ReactMarkdown>{result}</ReactMarkdown>
+                <div className="p-8 flex-1 overflow-y-auto break-words">
+                  <AIResultViewer content={result} type="analysis" />
                 </div>
                 <div className="p-6 bg-emerald-50 border-t border-emerald-100">
                   <div className="flex gap-3">

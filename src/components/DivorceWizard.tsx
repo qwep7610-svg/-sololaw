@@ -8,6 +8,7 @@ import { saveToHistory } from '../services/historyService';
 import StepIndicator from './StepIndicator';
 import AIAssistantBubble from './AIAssistantBubble';
 import LawyerMatching from './LawyerMatching';
+import FinalReviewModal from './FinalReviewModal';
 
 type DivorceType = 'property' | 'alimony' | 'asset_split' | 'parenting' | 'fault_evidence' | 'mediation';
 
@@ -64,6 +65,7 @@ export default function DivorceWizard({ onBack, onCalculateCost }: { onBack: () 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<{ data: string; mimeType: string; name: string } | null>(null);
   const [analysisResult, setAnalysisResult] = useState<{ primary_category: string; keywords: string[] } | null>(null);
+  const [showFinalReview, setShowFinalReview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -805,7 +807,7 @@ export default function DivorceWizard({ onBack, onCalculateCost }: { onBack: () 
               />
 
               <button
-                onClick={handleGenerate}
+                onClick={() => setShowFinalReview(true)}
                 disabled={isLoading}
                 className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg text-white disabled:opacity-50 ${
                   type === 'property' || type === 'asset_split' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' :
@@ -828,6 +830,16 @@ export default function DivorceWizard({ onBack, onCalculateCost }: { onBack: () 
               </button>
             </div>
           </div>
+
+          {showFinalReview && (
+            <FinalReviewModal 
+              onConfirm={() => {
+                setShowFinalReview(false);
+                handleGenerate();
+              }}
+              onCancel={() => setShowFinalReview(false)}
+            />
+          )}
 
           <div className="space-y-4">
             <AnimatePresence mode="wait">

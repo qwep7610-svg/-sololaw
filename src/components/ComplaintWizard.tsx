@@ -8,6 +8,7 @@ import { saveToHistory } from '../services/historyService';
 import StepIndicator from './StepIndicator';
 import AIAssistantBubble from './AIAssistantBubble';
 import LawyerMatching from './LawyerMatching';
+import FinalReviewModal from './FinalReviewModal';
 
 const DRAFT_KEY = 'SOLO_LAW_WIZARD_DRAFT';
 
@@ -188,6 +189,7 @@ export default function ComplaintWizard({ onBack, initialData: propInitialData }
   const [showFaq, setShowFaq] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<{ primary_category: string; keywords: string[] } | null>(null);
+  const [showFinalReview, setShowFinalReview] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -674,7 +676,7 @@ export default function ComplaintWizard({ onBack, initialData: propInitialData }
                     질문으로 돌아가기
                   </button>
                   <button 
-                    onClick={handleGenerate}
+                    onClick={() => setShowFinalReview(true)}
                     className="flex-[2] bg-[#2563EB] text-white py-3 md:py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#1D4ED8] transition-all shadow-lg shadow-blue-100 text-sm"
                   >
                     <Sparkles className="w-5 h-5" />
@@ -682,6 +684,16 @@ export default function ComplaintWizard({ onBack, initialData: propInitialData }
                   </button>
                 </div>
               </motion.div>
+            )}
+
+            {showFinalReview && (
+              <FinalReviewModal 
+                onConfirm={() => {
+                  setShowFinalReview(false);
+                  handleGenerate();
+                }}
+                onCancel={() => setShowFinalReview(false)}
+              />
             )}
 
             {isLoading && (

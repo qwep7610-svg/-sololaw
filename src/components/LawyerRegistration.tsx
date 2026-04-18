@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Camera, Save, Trash2, UserPlus, Image as ImageIcon, Check, AlertCircle, Sparkles, ShieldCheck, Loader2, Info, Megaphone, FileCheck, AlertTriangle, CreditCard, User as UserIcon, Eye } from 'lucide-react';
+import { ArrowLeft, Camera, Save, Trash2, UserPlus, Image as ImageIcon, Check, AlertCircle, Sparkles, ShieldCheck, Loader2, Info, Megaphone, FileCheck, AlertTriangle, CreditCard, User as UserIcon, Eye, MapPin, Map, ChevronRight } from 'lucide-react';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
 import { db, auth, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, handleFirestoreError, OperationType, query, where, getDocs, limit, orderBy, onSnapshot } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { generateLawyerMarketingCopy, checkLawyerAdCompliance } from '../services/gemini';
+import { KOREAN_REGIONS } from '../lib/regions';
 import SinglePlanCard from './SinglePlan';
 
 declare global {
@@ -724,15 +725,70 @@ export default function LawyerRegistration({ onBack }: { onBack: () => void }) {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
-                소속 지역/법률사무소 <span className="text-red-500">*</span>
+                소속 지역 (시/도) <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <select 
+                    value={profile.location.split(' ')[0] || ''}
+                    onChange={(e) => {
+                      const newSido = e.target.value;
+                      setProfile(prev => ({ ...prev, location: newSido }));
+                    }}
+                    className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all text-sm appearance-none bg-white font-medium"
+                  >
+                    <option value="" disabled>시/도 선택</option>
+                    {Object.keys(KOREAN_REGIONS).filter(r => r !== '전체').map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+                </div>
+
+                <div className="relative flex-1">
+                  <Map className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <select 
+                    value={profile.location.split(' ')[1] || ''}
+                    disabled={!profile.location.split(' ')[0]}
+                    onChange={(e) => {
+                      const sido = profile.location.split(' ')[0];
+                      const sigungu = e.target.value;
+                      const firmPart = profile.location.split(' / ')[1] || '';
+                      setProfile(prev => ({ 
+                        ...prev, 
+                        location: firmPart ? `${sido} ${sigungu} / ${firmPart}` : `${sido} ${sigungu}` 
+                      }));
+                    }}
+                    className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all text-sm appearance-none bg-white font-medium disabled:bg-slate-50 disabled:text-slate-400"
+                  >
+                    <option value="" disabled>시/군/구 선택</option>
+                    {profile.location.split(' ')[0] && KOREAN_REGIONS[profile.location.split(' ')[0]]?.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
+                상세 소속 (법률사무소/로펌명) <span className="text-red-500">*</span>
               </label>
               <input 
                 type="text"
-                value={profile.location}
-                onChange={(e) => setProfile(prev => ({ ...prev, location: e.target.value }))}
-                placeholder="예: 서울 서초구 / 법무법인 한결"
+                value={profile.location.split(' / ')[1] || ''}
+                onChange={(e) => {
+                  const regionPart = profile.location.split(' / ')[0] || '';
+                  setProfile(prev => ({ ...prev, location: `${regionPart} / ${e.target.value}` }));
+                }}
+                placeholder="예: 법무법인 한결"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all text-sm"
               />
+              <p className="text-[11px] text-slate-500 mt-1 ml-1 flex items-center gap-1">
+                <Info className="w-3 h-3" /> 실제 사무실이 위치한 시/도 및 시/군/구를 정확히 선택해 주세요.
+              </p>
             </div>
           </div>
 

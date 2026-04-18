@@ -20,6 +20,8 @@ import {
   ShieldAlert,
   TrendingUp,
   Clock,
+  Sparkles,
+  Cpu,
   CreditCard,
   ExternalLink,
   Trash2,
@@ -53,6 +55,8 @@ import { useAuth } from '../lib/AuthContext';
 import PolicyEditor from './PolicyEditor';
 import BrandingSettings from './BrandingSettings';
 import UserManagement from './UserManagement';
+import { seedDatabase } from '../services/adminService';
+import { Database } from 'lucide-react';
 
 type AdminTab = 'verification' | 'monitoring' | 'revenue' | 'security' | 'stats' | 'policies' | 'branding' | 'payments' | 'subscriptions' | 'users';
 
@@ -95,11 +99,41 @@ const AdminFeatureManager = ({ branding }: { branding: any }) => {
   ];
 
   return (
-    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-      <div className="flex items-center gap-2 mb-6 text-slate-800">
-        <Settings2 className="w-5 h-5 text-brand-600" />
-        <h3 className="font-bold text-lg">서비스 메뉴 및 기능 활성화 제어</h3>
+    <div className="space-y-6">
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-2 mb-6 text-slate-800">
+          <Database className="w-5 h-5 text-indigo-600" />
+          <h3 className="font-bold text-lg">데이터베이스 초기화 (Seeding)</h3>
+        </div>
+        
+        <div className="mb-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 italic text-sm text-indigo-700">
+          데이터베이스를 앱 권장 초기 상태로 채웁니다. (관리자 브랜딩, FAQ, 가이드, 샘플 변호사 등) 이미 데이터가 있는 경우 중복되지 않는 항목만 추가됩니다.
+        </div>
+
+        <button
+          onClick={async () => {
+            if (confirm("데이터베이스 초기화를 진행하시겠습니까?")) {
+              try {
+                await seedDatabase();
+                alert("초기화가 성공적으로 완료되었습니다.");
+                window.location.reload();
+              } catch (e: any) {
+                alert("초기화 실패: " + e.message);
+              }
+            }
+          }}
+          className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+        >
+          <Database className="w-5 h-5" />
+          데이터베이스 초기화 실행 (Seed)
+        </button>
       </div>
+
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-2 mb-6 text-slate-800">
+          <Settings2 className="w-5 h-5 text-brand-600" />
+          <h3 className="font-bold text-lg">서비스 메뉴 및 기능 활성화 제어</h3>
+        </div>
 
       <div className="mb-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
         <p className="text-sm text-blue-700 leading-relaxed">
@@ -130,10 +164,11 @@ const AdminFeatureManager = ({ branding }: { branding: any }) => {
         })}
       </div>
     </div>
+    </div>
   );
 };
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ onNavigate }: { onNavigate?: (view: any) => void }) {
   const [activeTab, setActiveTab] = useState<AdminTab>('verification');
   const { user } = useAuth();
   const [lawyerFilter, setLawyerFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -183,7 +218,26 @@ export default function AdminDashboard() {
   const [paymentSettings, setPaymentSettings] = useState<any>(null);
   const [isEditingPayment, setIsEditingPayment] = useState(false);
   const [editPayForm, setEditPayForm] = useState<any>(null);
+  const [aiUsageStats, setAiUsageStats] = useState<any>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUsageStats = async () => {
+      try {
+        const res = await fetch('/api/admin/usage-stats');
+        if (res.ok) {
+          const data = await res.json();
+          setAiUsageStats(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch usage stats:", e);
+      }
+    };
+    
+    if (activeTab === 'monitoring') {
+      fetchUsageStats();
+    }
+  }, [activeTab]);
   const [previewModal, setPreviewModal] = useState<{ show: boolean, lawyer: any, planType: string } | null>(null);
   const [subEditModal, setSubEditModal] = useState<{ show: boolean, sub: any | null }>({ show: false, sub: null });
   const [subEditForm, setSubEditForm] = useState({
@@ -671,28 +725,6 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleDeleteAdRequest = async (requestId: string) => {
-    setGenericConfirm({
-      show: true,
-      title: '입금 요청 삭제',
-      message: '정말로 이 입금 확인 요청을 삭제하시겠습니까?',
-      confirmText: '삭제하기',
-      type: 'danger',
-      onConfirm: async () => {
-        setLoading(true);
-        try {
-          await deleteDoc(doc(db, 'ad_payment_requests', requestId));
-          setSuccessMsg('입금 요청이 삭제되었습니다.');
-        } catch (error) {
-          handleFirestoreError(error, OperationType.DELETE, `ad_payment_requests/${requestId}`);
-        } finally {
-          setLoading(false);
-          setGenericConfirm(prev => ({ ...prev, show: false }));
-        }
-      }
-    });
-  };
-
   const handleApproveAdPayment = async (request: any) => {
     setGenericConfirm({
       show: true,
@@ -925,10 +957,11 @@ export default function AdminDashboard() {
       // Also update the lawyer document to keep it in sync
       const lawyerRef = doc(db, 'lawyers', subEditModal.sub.lawyerId);
       await updateDoc(lawyerRef, {
-        adPlan: subEditForm.planType,
+        adPlan: subEditForm.status === 'active' ? subEditForm.planType : null,
         adStatus: subEditForm.status === 'active' ? 'active' : 'inactive',
         priority: subEditForm.status === 'active' ? (subEditForm.planType === 'partnership' ? 2 : 0) : 0,
         hasActiveSubscription: subEditForm.status === 'active',
+        adExpiryDate: subEditForm.status === 'active' ? (subEditModal.sub.nextBillingDate || null) : null,
         updatedAt: serverTimestamp()
       });
 
@@ -1119,25 +1152,34 @@ export default function AdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
-            <div className="flex items-center gap-2 mb-4">
-              {(['pending', 'approved', 'rejected'] as const).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setLawyerFilter(status)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    lawyerFilter === status 
-                      ? 'bg-brand-600 text-white shadow-md' 
-                      : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : '반려됨'}
-                  <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] ${
-                    lawyerFilter === status ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    {allLawyers.filter(l => l.status === status).length}
-                  </span>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                {(['pending', 'approved', 'rejected'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setLawyerFilter(status)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      lawyerFilter === status 
+                        ? 'bg-brand-600 text-white shadow-md' 
+                        : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : '반려됨'}
+                    <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] ${
+                      lawyerFilter === status ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {allLawyers.filter(l => l.status === status).length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => onNavigate?.('admin_approval')}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-brand-600 transition-all shadow-lg"
+              >
+                <ShieldCheck className="w-4 h-4 text-brand-400" />
+                프로필 변경 승인 관리 (Dashboard)
+              </button>
             </div>
 
             <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
@@ -1319,6 +1361,114 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+
+            <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-[#F1F5F9] flex items-center justify-between">
+                <div className="flex flex-col">
+                  <h3 className="font-bold text-lg flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-indigo-600" />
+                    AI API 할당량 및 사용량 모니터링
+                  </h3>
+                  <p className="text-xs text-[#64748B] mt-1">사용자별 일일 AI 호출 제한(15회) 및 전체 API 사용 현황을 모니터링합니다.</p>
+                </div>
+                {aiUsageStats && (
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">오늘 총 요청</p>
+                    <p className="text-xl font-bold text-indigo-600">{aiUsageStats.totalToday}회</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <Cpu className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">인스턴스 최적화</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">메모리: 256MiB<br/>Auto-Scaling: On</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                        <Lock className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">App Check</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">부정 호출 차단 모드<br/>상태: 활성화됨</p>
+                  </div>
+                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center">
+                        <Database className="w-4 h-4 text-indigo-700" />
+                      </div>
+                      <span className="text-xs font-bold text-indigo-900">Usage DB</span>
+                    </div>
+                    <p className="text-[10px] text-indigo-600 leading-tight">Firestore 기반<br/>일일 쿼터 동기화 중</p>
+                  </div>
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-amber-700" />
+                      </div>
+                      <span className="text-xs font-bold text-amber-900">Quota Limit</span>
+                    </div>
+                    <p className="text-[10px] text-amber-600 leading-tight">유저당: 15회/일<br/>초과 시 429 Error</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    실시간 상위 사용 사용자 (Top 10)
+                  </h4>
+                  <div className="overflow-hidden border border-slate-100 rounded-2xl">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          <th className="py-3 px-4">사용자 ID</th>
+                          <th className="py-3 px-4">오늘 사용 횟수</th>
+                          <th className="py-3 px-4">할당량 비중</th>
+                          <th className="py-3 px-4">최근 활동</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {aiUsageStats?.topUsers?.map((user: any, i: number) => (
+                          <tr key={i} className="text-xs hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-4 font-mono text-slate-500">{user.userId}</td>
+                            <td className="py-3 px-4">
+                              <span className={`font-bold ${user.count >= 12 ? 'text-red-500' : 'text-slate-700'}`}>
+                                {user.count} / 15
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 w-1/4">
+                              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full ${user.count >= 12 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                                  style={{ width: `${(user.count / 15) * 100}%` }}
+                                />
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-400">
+                              {user.updatedAt ? new Date(user.updatedAt._seconds * 1000).toLocaleTimeString() : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                        {(!aiUsageStats?.topUsers || aiUsageStats.topUsers.length === 0) && (
+                          <tr>
+                            <td colSpan={4} className="py-8 text-center text-slate-400 text-xs italic">
+                              오늘 AI 서비스 사용 데이터가 아직 없습니다.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -1416,53 +1566,87 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-[2.5rem] border border-[#E2E8F0] p-8 shadow-sm hover:shadow-md transition-shadow space-y-6 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-50/50 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-brand-100/50 transition-colors" />
+                <div className="bg-white rounded-[2.5rem] border border-[#E2E8F0] p-8 shadow-sm hover:shadow-md transition-all duration-300 space-y-6 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-brand-50/30 rounded-full -mr-24 -mt-24 blur-3xl group-hover:bg-brand-100/40 transition-colors duration-500" />
                   
                   <div className="flex items-center justify-between relative">
-                    <h3 className="font-black text-xl flex items-center gap-3 text-slate-900">
-                      <div className="w-10 h-10 rounded-2xl bg-brand-50 flex items-center justify-center">
-                        <Megaphone className="w-5 h-5 text-brand-600" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-brand-50 flex items-center justify-center shadow-inner">
+                        <Megaphone className="w-6 h-6 text-brand-600" />
                       </div>
-                      광고 슬롯 관리
-                    </h3>
-                    <span className="text-[10px] font-bold px-2 py-1 bg-slate-100 text-slate-500 rounded-lg">
-                      {adSlots.length}개 슬롯 운영 중
-                    </span>
+                      <div>
+                        <h3 className="font-black text-xl text-slate-900 tracking-tight">광고 슬롯 관리</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ad Inventory Selection</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black px-2.5 py-1 bg-brand-600 text-white rounded-full shadow-sm shadow-brand-100">
+                        {adSlots.length} Slots Active
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="space-y-3 relative">
-                    {adSlots.map((slot) => (
-                      <div key={slot.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30 hover:bg-white hover:shadow-lg hover:shadow-slate-100 transition-all flex items-center justify-between group/item">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center font-black text-brand-600 text-xs shadow-sm">
-                            {slot.slotId}
+                  <div className="space-y-4 relative">
+                    {adSlots.map((slot) => {
+                      const lawyer = allLawyers.find(l => l.id === slot.lawyerId || l.uid === slot.lawyerId);
+                      const isSubActive = lawyer?.adStatus === 'active';
+                      
+                      return (
+                        <div key={slot.id} className="p-5 rounded-3xl border border-slate-100 bg-white hover:border-brand-200 hover:shadow-xl hover:shadow-slate-100 transition-all duration-300 flex items-center justify-between group/item">
+                          <div className="flex items-center gap-5">
+                            <div className="relative">
+                              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-brand-600 text-sm shadow-sm">
+                                {slot.slotId}
+                              </div>
+                              <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm flex items-center justify-center ${isSubActive ? 'bg-green-500' : 'bg-slate-300'}`}>
+                                {isSubActive ? <CheckCircle2 className="w-2.5 h-2.5 text-white" /> : <XCircle className="w-2.5 h-2.5 text-white" />}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-black text-slate-800 text-base">{slot.lawyerName}</h4>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-lg font-bold ${isSubActive ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-400'}`}>
+                                  {isSubActive ? '구독 기반 광고 중' : '구독 만료/중지'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1">
+                                <p className="text-xs font-bold text-brand-600">
+                                  {slot.bidAmount.toLocaleString()}원 <span className="text-slate-300 font-normal">/ month</span>
+                                </p>
+                                <div className="w-1 h-1 rounded-full bg-slate-200" />
+                                <p className="text-[10px] text-slate-400 font-medium">
+                                  {slot.startDate} ~ {slot.endDate}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-bold text-slate-800">{slot.lawyerName}</h4>
-                            <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                              입찰: <span className="text-brand-600 font-bold">{slot.bidAmount.toLocaleString()}원</span> | {slot.startDate} ~ {slot.endDate}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => {
+                                setAdSlotModal({ show: true, slot });
+                                setAdSlotForm({
+                                  slotId: slot.slotId,
+                                  lawyerName: slot.lawyerName,
+                                  lawyerId: slot.lawyerId || '',
+                                  bidAmount: slot.bidAmount,
+                                  startDate: slot.startDate,
+                                  endDate: slot.endDate
+                                });
+                              }}
+                              className="p-3 bg-slate-50 hover:bg-brand-50 rounded-2xl transition-all duration-200 group-hover/item:scale-105"
+                            >
+                              <Settings2 className="w-4 h-4 text-slate-400 group-hover/item:text-brand-600" />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteAdSlot(slot.id)}
+                              className="p-3 bg-slate-50 hover:bg-red-50 rounded-2xl transition-all duration-200 group-hover/item:scale-105"
+                            >
+                              <Trash2 className="w-4 h-4 text-slate-400 group-hover/item:text-red-500" />
+                            </button>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => {
-                            setAdSlotModal({ show: true, slot });
-                            setAdSlotForm({
-                              slotId: slot.slotId,
-                              lawyerName: slot.lawyerName,
-                              lawyerId: slot.lawyerId || '',
-                              bidAmount: slot.bidAmount,
-                              startDate: slot.startDate,
-                              endDate: slot.endDate
-                            });
-                          }}
-                          className="p-2 hover:bg-brand-50 rounded-xl transition-all group-hover/item:translate-x-1"
-                        >
-                          <ChevronRight className="w-5 h-5 text-slate-300 group-hover/item:text-brand-600" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <button 
                       onClick={() => {
                         setAdSlotModal({ show: true, slot: null });
@@ -1475,12 +1659,15 @@ export default function AdminDashboard() {
                           endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
                         });
                       }}
-                      className="w-full py-5 border-2 border-dashed border-slate-200 bg-slate-50/50 rounded-[2rem] text-slate-500 text-sm font-black hover:bg-brand-50 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-3 group/btn"
+                      className="w-full py-6 border-2 border-dashed border-slate-200 bg-slate-50/30 rounded-[2rem] text-slate-500 text-sm font-black hover:bg-brand-50/50 hover:border-brand-200 hover:text-brand-600 transition-all duration-300 flex items-center justify-center gap-4 group/btn"
                     >
-                      <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover/btn:border-brand-300 group-hover/btn:bg-brand-100 transition-all shadow-sm">
-                        <Plus className="w-5 h-5" />
+                      <div className="w-12 h-12 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover/btn:border-brand-300 group-hover/btn:bg-white group-hover/btn:shadow-lg group-hover/btn:shadow-brand-100 transition-all duration-300">
+                        <Plus className="w-6 h-6" />
                       </div>
-                      새 광고 슬롯 추가하기
+                      <div className="text-left">
+                        <div className="text-sm font-black">새 광고 슬롯 추가</div>
+                        <div className="text-[10px] text-slate-400 font-bold group-hover/btn:text-brand-400">인벤토리 직접 할당</div>
+                      </div>
                     </button>
                   </div>
                 </div>
@@ -1921,20 +2108,13 @@ export default function AdminDashboard() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => {
-                                const lawyerInfo = allLawyers.find(l => l.uid === req.lawyerId) || { name: req.lawyerName, uid: req.lawyerId };
+                                const lawyerInfo = allLawyers.find(l => l.id === req.lawyerId) || { name: req.lawyerName, id: req.lawyerId };
                                 setPreviewModal({ show: true, lawyer: lawyerInfo, planType: req.planType });
                               }}
                               className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
                               title="미리보기"
                             >
                               <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteAdRequest(req.id)}
-                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                              title="삭제"
-                            >
-                              <Trash2 className="w-4 h-4" />
                             </button>
                             {req.status === 'pending' && (
                               <>

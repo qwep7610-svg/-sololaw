@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, Scale, Sparkles, ArrowLeft, Loader2, Info, CheckCircle2, AlertCircle, MessageSquare } from 'lucide-react';
 import { classifyLitigationType } from '../services/gemini';
 import Markdown from 'react-markdown';
+import AIResultViewer from './AIResultViewer';
 
 export default function LitigationTypeFinder({ onBack, onStartComplaint }: { onBack: () => void; onStartComplaint: (situation: string) => void }) {
   const [situation, setSituation] = useState('');
@@ -93,8 +94,8 @@ export default function LitigationTypeFinder({ onBack, onStartComplaint }: { onB
                   </div>
                 </div>
 
-                <div className="markdown-body prose prose-slate max-w-none prose-h3:text-brand-700 prose-h3:font-serif prose-h3:text-2xl prose-li:text-slate-600 prose-li:font-medium">
-                  <Markdown>{result}</Markdown>
+                <div className="markdown-body max-w-none">
+                  <AIResultViewer content={result} type="analysis" />
                 </div>
 
                 <div className="bg-slate-50 rounded-2xl p-6 flex gap-4 border border-slate-100">

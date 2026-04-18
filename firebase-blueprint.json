@@ -300,6 +300,19 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["action", "timestamp"]
+    },
+    "ai_usage": {
+      "title": "AI Usage",
+      "description": "Daily AI request tracking for quota management",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "count": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date", "count"]
     }
   },
   "firestore": {
@@ -366,6 +379,10 @@
     "/logs/{logId}": {
       "schema": "log",
       "description": "System and audit logs"
+    },
+    "/ai_usage/{usageId}": {
+      "schema": "ai_usage",
+      "description": "Daily AI quota tracking documents"
     }
   }
 }

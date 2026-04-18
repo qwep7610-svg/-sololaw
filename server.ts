@@ -5,34 +5,153 @@ import { fileURLToPath } from "url";
 import cron from "node-cron";
 import axios from "axios";
 import admin from "firebase-admin";
+import fs from "fs";
+
+import { getFirestore } from "firebase-admin/firestore";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
-// Note: In a real production environment, you would use a service account key.
-// Here we initialize with default credentials or empty if not available.
 if (!admin.apps.length) {
   try {
+    const firebaseConfigPath = path.join(__dirname, 'firebase-applet-config.json');
+    let projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+    if (fs.existsSync(firebaseConfigPath)) {
+      const config = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
+      projectId = projectId || config.projectId;
+    }
     admin.initializeApp({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID || "solo-law-app",
+      projectId: projectId || "solo-law-app",
     });
   } catch (error) {
     console.error("Firebase Admin initialization error:", error);
   }
 }
 
-const db = admin.firestore();
+// Get the correct database instance
+const getDb = () => {
+  try {
+    const configPath = path.join(__dirname, 'firebase-applet-config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.firestoreDatabaseId) {
+        console.log(`[Firebase] Using Named Database ID: ${config.firestoreDatabaseId}`);
+        return getFirestore(admin.app(), config.firestoreDatabaseId);
+      }
+    }
+    console.log("[Firebase] Using (default) Database");
+  } catch (e) {
+    console.error("[Firebase] Failed to get named database, falling back to default:", e);
+  }
+  return getFirestore();
+};
+
+const db = getDb();
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Cloud Run Cost Optimization:
+  // 1. Instance Memory: 256MiB - Optimized for light API handling (Costs 50% less than 512MiB)
+  // 2. CPU allocation: CPU is only allocated during request processing
+  // 3. Auto-scaling: min-instances 0 ensures zero cost when idle
+  
   app.use(express.json());
 
   // API routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // AI Usage Tracking API
+  app.post("/api/usage/ai", async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId" });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const usageRef = db.collection("ai_usage").doc(`${userId}_${today}`);
+
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const usageDoc = await transaction.get(usageRef);
+        const currentCount = usageDoc.exists ? usageDoc.data()?.count || 0 : 0;
+        const dailyLimit = 15; // Set a default daily limit
+
+        if (currentCount >= dailyLimit) {
+          return { allowed: false, currentCount, dailyLimit };
+        }
+
+        if (usageDoc.exists) {
+          transaction.update(usageRef, {
+            count: currentCount + 1,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        } else {
+          transaction.set(usageRef, {
+            userId,
+            date: today,
+            count: 1,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+
+        return { allowed: true, currentCount: currentCount + 1, dailyLimit };
+      });
+
+      if (!result.allowed) {
+        return res.status(429).json({
+          error: "Daily AI usage limit reached",
+          message: `일일 AI 사용량(${result.dailyLimit}회)을 모두 소진했습니다. 내일 다시 이용해 주세요.`,
+          ...result
+        });
+      }
+
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("AI Usage Transaction Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  // AI Usage Stats for Admin
+  app.get("/api/admin/usage-stats", async (req, res) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Simplify query to avoid index requirement for first run
+      const snapshot = await db.collection("ai_usage")
+        .where("date", "==", today)
+        .get();
+
+      const allDocs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Sort in-memory to avoid composite index PERMISSION_DENIED/FAILED_PRECONDITION
+      const topUsers = allDocs
+        .sort((a: any, b: any) => (b.count || 0) - (a.count || 0))
+        .slice(0, 10);
+      
+      const totalToday = allDocs.reduce((acc, doc: any) => acc + (doc.count || 0), 0);
+
+      res.json({
+        date: today,
+        totalToday,
+        topUsers
+      });
+    } catch (error) {
+      console.error("[Admin] Fetch Usage Stats Error:", error);
+      res.status(500).json({ 
+        error: "Internal Server Error",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   });
 
   // Toss Payments: Exchange authKey for billingKey
@@ -198,15 +317,28 @@ async function startServer() {
           console.log(`Successfully processed payment and renewed subscription for: ${sub.lawyerId}`);
         } catch (payError) {
           console.error(`Payment failed for lawyer ${sub.lawyerId}:`, payError);
-          await doc.ref.update({
+          // Update lawyer status to reflect failed payment
+          const batch = db.batch();
+          batch.update(db.collection("subscriptions").doc(doc.id), {
             status: "failed",
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
           
-          // Update lawyer status to reflect failed payment
-          await db.collection("lawyers").doc(sub.lawyerId).update({
-            hasActiveSubscription: false
+          batch.update(db.collection("lawyers").doc(sub.lawyerId), {
+            hasActiveSubscription: false,
+            adStatus: "failed",
+            adPlan: null,
+            priority: 0,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
+          
+          // Also remove from ad slots if payment fails
+          const adSlots = await db.collection("ad_slots").where("lawyerId", "==", sub.lawyerId).get();
+          adSlots.docs.forEach(slotDoc => {
+            batch.delete(slotDoc.ref);
+          });
+          
+          await batch.commit();
         }
       }
     } catch (error) {

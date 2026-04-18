@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, MapPin, Scale, ShieldCheck, Star, Clock, CheckCircle2, MessageSquare, Award, ChevronRight, Info, Filter, X, Sparkles } from 'lucide-react';
+import { Search, MapPin, Scale, ShieldCheck, Star, Clock, CheckCircle2, MessageSquare, Award, ChevronRight, Info, Filter, X, Sparkles, Map } from 'lucide-react';
 import { collection, query, where, getDocs, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { generateMatchingRecommendation } from '../services/gemini';
+import { KOREAN_REGIONS } from '../lib/regions';
+import { Logo } from './Logo';
 
 interface Lawyer {
   id: string;
@@ -32,19 +34,14 @@ const CATEGORIES = [
   '전체', '민사', '형사', '이혼/가사', '부동산/임대차', '상속', '성범죄', '교통사고', '근로/노동', '기업/상사'
 ];
 
-const REGIONS = [
-  '전국', '서울 서초구', '서울 강남구', '서울 송파구', '경기 수원시', '경기 성남시', '인천', '부산', '대구', '대전', '광주'
-];
-
-import { Logo } from './Logo';
-
 export default function LawyerSearch({ onBack }: { onBack: () => void }) {
   const { user } = useAuth();
   const [allLawyers, setAllLawyers] = useState<Lawyer[]>([]);
   const [lawyers, setLawyers] = useState<Lawyer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('전체');
-  const [selectedRegion, setSelectedRegion] = useState('전국');
+  const [selectedRegion, setSelectedRegion] = useState('전체');
+  const [selectedDistrict, setSelectedDistrict] = useState('전체');
   const [searchQuery, setSearchQuery] = useState('');
   const [recommendationText, setRecommendationText] = useState('');
 
@@ -84,11 +81,17 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
     // Filtering logic
     let filtered = allLawyers.filter(lawyer => {
       const categoryMatch = selectedCategory === '전체' || lawyer.specialties.some(s => s.includes(selectedCategory));
-      const regionMatch = selectedRegion === '전국' || lawyer.location.includes(selectedRegion);
+      
+      let regionMatch = true;
+      if (selectedRegion !== '전체') {
+        const stateMatch = lawyer.location.includes(selectedRegion.substring(0, 2)); // Use first 2 chars for flexible matching (e.g. 경기 vs 경기도)
+        const districtMatch = selectedDistrict === '전체' || lawyer.location.includes(selectedDistrict);
+        regionMatch = stateMatch && districtMatch;
+      }
       
       const queryMatch = !searchQuery || 
                          lawyer.name.includes(searchQuery) || 
-                         lawyer.firm.includes(searchQuery) || 
+                         (lawyer.firmName || lawyer.firm || '').includes(searchQuery) || 
                          lawyer.specialties.some(s => s.includes(searchQuery)) ||
                          lawyer.location.includes(searchQuery);
       return categoryMatch && regionMatch && queryMatch;
@@ -137,12 +140,12 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
 
     const fetchRecommendation = async () => {
       // AI Recommendation for the search
-      if (selectedCategory !== '전체' || selectedRegion !== '전국') {
+      if (selectedCategory !== '전체' || selectedRegion !== '전체') {
         const rec = await generateMatchingRecommendation({
           userNickname: user?.displayName || '사용자',
           primaryCategory: selectedCategory === '전체' ? '다양한' : selectedCategory,
           keywords: [selectedCategory, searchQuery].filter(Boolean),
-          userLocation: selectedRegion === '전국' ? undefined : selectedRegion
+          userLocation: selectedRegion === '전체' ? undefined : (selectedDistrict === '전체' ? selectedRegion : `${selectedRegion} ${selectedDistrict}`)
         });
         setRecommendationText(rec);
       } else {
@@ -151,7 +154,7 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
     };
 
     fetchRecommendation();
-  }, [allLawyers, selectedCategory, selectedRegion, searchQuery, user]);
+  }, [allLawyers, selectedCategory, selectedRegion, selectedDistrict, searchQuery, user]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
@@ -185,16 +188,45 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
               className="w-full pl-14 pr-6 py-4.5 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-brand-500/20 focus:ring-4 focus:ring-brand-500/5 transition-all outline-none text-sm font-medium"
             />
           </div>
-          <div className="relative group">
-            <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
-            <select 
-              value={selectedRegion}
-              onChange={(e) => setSelectedRegion(e.target.value)}
-              className="pl-12 pr-10 py-4.5 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-brand-500/20 focus:ring-4 focus:ring-brand-500/5 transition-all outline-none text-sm appearance-none font-bold text-slate-700 cursor-pointer"
-            >
-              {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+          
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative group min-w-[140px]">
+              <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
+              <select 
+                value={selectedRegion}
+                onChange={(e) => {
+                  setSelectedRegion(e.target.value);
+                  setSelectedDistrict('전체');
+                }}
+                className="w-full pl-12 pr-10 py-4.5 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-brand-500/20 focus:ring-4 focus:ring-brand-500/5 transition-all outline-none text-sm appearance-none font-bold text-slate-700 cursor-pointer"
+              >
+                {Object.keys(KOREAN_REGIONS).map(r => (
+                  <option key={r} value={r}>{r === '전체' ? '지역 전체' : r}</option>
+                ))}
+              </select>
+              <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+            </div>
+
+            {selectedRegion !== '전체' && KOREAN_REGIONS[selectedRegion].length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="relative group min-w-[140px]"
+              >
+                <Map className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
+                <select 
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="w-full pl-12 pr-10 py-4.5 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-brand-500/20 focus:ring-4 focus:ring-brand-500/5 transition-all outline-none text-sm appearance-none font-bold text-slate-700 cursor-pointer"
+                >
+                  <option value="전체">시/군/구 전체</option>
+                  {KOREAN_REGIONS[selectedRegion].map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+              </motion.div>
+            )}
           </div>
         </div>
 
@@ -343,8 +375,8 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                        <MapPin className={`w-4 h-4 ${selectedRegion !== '전국' && lawyer.location.includes(selectedRegion) ? 'text-brand-500' : 'text-slate-400'}`} />
-                        <span className={selectedRegion !== '전국' && lawyer.location.includes(selectedRegion) ? 'text-brand-600 font-bold' : ''}>
+                        <MapPin className={`w-4 h-4 ${selectedRegion !== '전체' && lawyer.location.includes(selectedRegion.substring(0, 2)) ? 'text-brand-500' : 'text-slate-400'}`} />
+                        <span className={selectedRegion !== '전체' && lawyer.location.includes(selectedRegion.substring(0, 2)) ? 'text-brand-600 font-bold' : ''}>
                           {lawyer.location}
                         </span>
                       </div>
@@ -375,7 +407,8 @@ export default function LawyerSearch({ onBack }: { onBack: () => void }) {
             <button 
               onClick={() => {
                 setSelectedCategory('전체');
-                setSelectedRegion('전국');
+                setSelectedRegion('전체');
+                setSelectedDistrict('전체');
                 setSearchQuery('');
               }}
               className="text-brand-600 text-xs font-bold hover:underline"

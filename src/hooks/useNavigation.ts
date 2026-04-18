@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 
-export type View = 'home' | 'complaint' | 'summarizer' | 'history' | 'correction' | 'exhibit' | 'cost' | 'admin_appeal' | 'demand_letter' | 'divorce' | 'lawyer_reg' | 'security' | 'admin' | 'customer_center' | 'lawyer_review' | 'lawyer_search' | 'subscription' | 'litigation_finder' | 'about' | 'payment_success' | 'payment_fail' | 'ad_preview_demo';
+export type View = 'home' | 'complaint' | 'summarizer' | 'history' | 'correction' | 'exhibit' | 'cost' | 'admin_appeal' | 'demand_letter' | 'divorce' | 'lawyer_reg' | 'lawyer_edit_profile' | 'security' | 'admin' | 'admin_approval' | 'customer_center' | 'lawyer_review' | 'lawyer_search' | 'subscription' | 'litigation_finder' | 'about' | 'payment_success' | 'payment_fail' | 'ad_preview_demo';
 
 export function useNavigation(initialView: View = 'home') {
   const [view, setView] = useState<View>(initialView);

@@ -26,6 +26,8 @@ const AuthWizard = lazy(() => import('./components/AuthWizard'));
 const SecuritySettings = lazy(() => import('./components/SecuritySettings'));
 const TermsOfService = lazy(() => import('./components/TermsOfService'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const AdminApproval = lazy(() => import('./components/AdminApproval'));
+const LawyerEditProfile = lazy(() => import('./components/LawyerEditProfile'));
 const CustomerCenter = lazy(() => import('./components/CustomerCenter'));
 const LawyerReviewService = lazy(() => import('./components/LawyerReviewService'));
 const LawyerSearch = lazy(() => import('./components/LawyerSearch'));
@@ -758,7 +760,9 @@ export default function App() {
     if (view === 'customer_center') return <CustomerCenter onBack={() => navigateTo('home')} onNavigate={navigateTo} />;
     if (view === 'about') return <AboutUs onBack={() => navigateTo('home')} onNavigate={navigateTo} />;
     if (view === 'security') return <ProtectedRoute onNavigate={navigateTo}><SecuritySettings onBack={() => navigateTo('home')} /></ProtectedRoute>;
-    if (view === 'admin') return <ProtectedRoute requiredRole="admin" onNavigate={navigateTo}><AdminDashboard /></ProtectedRoute>;
+    if (view === 'admin') return <ProtectedRoute requiredRole="admin" onNavigate={navigateTo}><AdminDashboard onNavigate={navigateTo} /></ProtectedRoute>;
+    if (view === 'admin_approval') return <ProtectedRoute requiredRole="admin" onNavigate={navigateTo}><AdminApproval onBack={() => navigateTo('admin')} /></ProtectedRoute>;
+    if (view === 'lawyer_edit_profile') return <ProtectedRoute requiredRole="lawyer" onNavigate={navigateTo}><LawyerEditProfile onBack={() => navigateTo('home')} /></ProtectedRoute>;
     if (view === 'payment_success') return <PaymentResult type="success" onNavigate={navigateTo} />;
     if (view === 'payment_fail') return <PaymentResult type="fail" onNavigate={navigateTo} />;
     if (view === 'ad_preview_demo') return <AdPreviewDemo onBack={() => navigateTo('home')} />;
@@ -883,15 +887,26 @@ export default function App() {
                               </button>
                             )}
                             {user.role === 'lawyer' && (
-                              <button 
-                                onClick={() => {
-                                  navigateTo('subscription');
-                                  setShowUserMenu(false);
-                                }}
-                                className="w-full flex items-center gap-2 p-4 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium border-b border-[#E2E8F0]"
-                              >
-                                <CreditCard className="w-4 h-4 text-brand-600" /> 구독 및 결제 관리
-                              </button>
+                              <>
+                                <button 
+                                  onClick={() => {
+                                    navigateTo('lawyer_edit_profile');
+                                    setShowUserMenu(false);
+                                  }}
+                                  className="w-full flex items-center gap-2 p-4 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium border-b border-[#E2E8F0]"
+                                >
+                                  <UserIcon className="w-4 h-4 text-brand-600" /> 프로필 관리
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    navigateTo('subscription');
+                                    setShowUserMenu(false);
+                                  }}
+                                  className="w-full flex items-center gap-2 p-4 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium border-b border-[#E2E8F0]"
+                                >
+                                  <CreditCard className="w-4 h-4 text-brand-600" /> 구독 및 결제 관리
+                                </button>
+                              </>
                             )}
                             <button 
                               onClick={() => {

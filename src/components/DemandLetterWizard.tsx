@@ -8,6 +8,7 @@ import { saveToHistory } from '../services/historyService';
 import StepIndicator from './StepIndicator';
 import AIAssistantBubble from './AIAssistantBubble';
 import LawyerMatching from './LawyerMatching';
+import FinalReviewModal from './FinalReviewModal';
 
 export default function DemandLetterWizard({ onBack }: { onBack: () => void }) {
   const { user } = useAuth();
@@ -25,6 +26,7 @@ export default function DemandLetterWizard({ onBack }: { onBack: () => void }) {
   const [isSaved, setIsSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<{ primary_category: string; keywords: string[] } | null>(null);
+  const [showFinalReview, setShowFinalReview] = useState(false);
 
   const handleGenerate = async () => {
     if (!formData.sender || !formData.receiver || !formData.title || !formData.context) return;
@@ -226,7 +228,7 @@ export default function DemandLetterWizard({ onBack }: { onBack: () => void }) {
             />
 
             <button
-              onClick={handleGenerate}
+              onClick={() => setShowFinalReview(true)}
               disabled={!formData.sender || !formData.receiver || !formData.title || isLoading}
               className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-100"
             >
@@ -244,6 +246,16 @@ export default function DemandLetterWizard({ onBack }: { onBack: () => void }) {
             </button>
           </div>
         </div>
+
+        {showFinalReview && (
+          <FinalReviewModal 
+            onConfirm={() => {
+              setShowFinalReview(false);
+              handleGenerate();
+            }}
+            onCancel={() => setShowFinalReview(false)}
+          />
+        )}
 
         {/* Result Section */}
         <div className="space-y-4">

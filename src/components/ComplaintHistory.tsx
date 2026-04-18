@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Trash2, Calendar, FileText, ChevronRight, Search, Inbox, AlertCircle, X, Calculator, Download, Edit3, Save, Check } from 'lucide-react';
+import { ArrowLeft, Trash2, Calendar, FileText, ChevronRight, Search, Inbox, AlertCircle, X, Calculator, Download, Edit3, Save, Check, ShieldCheck, ShieldAlert, ListOrdered, File } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../lib/AuthContext';
 import { subscribeToHistory, deleteFromHistory, updateHistory, SavedComplaint } from '../services/historyService';
@@ -100,10 +100,26 @@ export default function ComplaintHistory({ onBack, onCalculateCost }: { onBack: 
     }
   };
 
-  const filteredHistory = history.filter(item => 
-    item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.content.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getHistoryTypeInfo = (type: string) => {
+    switch (type) {
+      case 'complaint': return { label: '소장', icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-50' };
+      case 'demand_letter': return { label: '내용증명', icon: File, color: 'text-indigo-600', bgColor: 'bg-indigo-50' };
+      case 'divorce': return { label: '이혼소송', icon: FileText, color: 'text-rose-600', bgColor: 'bg-rose-50' };
+      case 'admin_appeal': return { label: '행정심판', icon: FileText, color: 'text-amber-600', bgColor: 'bg-amber-50' };
+      case 'summary': return { label: '문서요약', icon: ShieldCheck, color: 'text-emerald-600', bgColor: 'bg-emerald-50' };
+      case 'correction': return { label: '보정분석', icon: ShieldAlert, color: 'text-red-600', bgColor: 'bg-red-50' };
+      case 'exhibit': return { label: '증거정리', icon: ListOrdered, color: 'text-teal-600', bgColor: 'bg-teal-50' };
+      case 'cost_calc': return { label: '비용계산', icon: Calculator, color: 'text-blue-600', bgColor: 'bg-blue-50' };
+      default: return { label: '기타', icon: FileText, color: 'text-slate-600', bgColor: 'bg-slate-50' };
+    }
+  };
+
+  const filteredHistory = history.filter(item => {
+    const typeInfo = getHistoryTypeInfo(item.type);
+    return item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           item.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           typeInfo.label.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const selectedComplaint = history.find(item => item.id === selectedId);
 
@@ -175,13 +191,26 @@ export default function ComplaintHistory({ onBack, onCalculateCost }: { onBack: 
                     selectedId === item.id ? 'bg-brand-50' : ''
                   }`}
                 >
-                  <div className="space-y-1 min-w-0">
-                    <h3 className={`font-bold text-sm truncate font-serif ${selectedId === item.id ? 'text-brand-600' : 'text-[#1E293B]'}`}>
-                      {item.title}
-                    </h3>
-                    <div className="flex items-center gap-2 text-[10px] text-[#64748B]">
-                      <Calendar className="w-3 h-3" />
-                      {item.date}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${getHistoryTypeInfo(item.type).bgColor}`}>
+                      {(() => {
+                        const Icon = getHistoryTypeInfo(item.type).icon;
+                        return <Icon className={`w-4 h-4 ${getHistoryTypeInfo(item.type).color}`} />;
+                      })()}
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${getHistoryTypeInfo(item.type).bgColor} ${getHistoryTypeInfo(item.type).color}`}>
+                          {getHistoryTypeInfo(item.type).label}
+                        </span>
+                        <h3 className={`font-bold text-sm truncate font-serif ${selectedId === item.id ? 'text-brand-600' : 'text-[#1E293B]'}`}>
+                          {item.title}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-[#64748B]">
+                        <Calendar className="w-3 h-3" />
+                        {item.date}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, ShieldAlert, Loader2, Copy, Check, AlertCircle, Sparkles, Camera, Upload, X, File, Gavel, Save, Download, Lock, ShieldCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import AIResultViewer from './AIResultViewer';
 import { analyzeCorrectionOrder } from '../services/gemini';
 import { useAuth } from '../lib/AuthContext';
 import { saveToHistory } from '../services/historyService';
@@ -24,6 +25,16 @@ export default function CorrectionGuard({ onBack, onConsultLawyer }: { onBack: (
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
+
+  const loadingStages = [
+    "명령서 내용을 스캔하고 있습니다...",
+    "법률 용어를 일반어로 번역 중입니다...",
+    "지적 사항의 원인을 분석하고 있습니다...",
+    "해결을 위한 최적의 대응 방안을 찾는 중입니다...",
+    "법원에 제출할 보정서 초안을 작성하고 있습니다..."
+  ];
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -93,16 +104,23 @@ export default function CorrectionGuard({ onBack, onConsultLawyer }: { onBack: (
 
     setIsLoading(true);
     setResult(null);
+    setLoadingStage(0);
+    
+    const stageInterval = setInterval(() => {
+      setLoadingStage(prev => (prev + 1) % loadingStages.length);
+    }, 2000);
+
     try {
       const analysis = await analyzeCorrectionOrder({
         text: text.trim() || undefined,
         file: selectedFile ? { data: selectedFile.data, mimeType: selectedFile.mimeType } : undefined
-      });
+      }, user?.uid);
       setResult(analysis || '분석에 실패했습니다.');
     } catch (error) {
       console.error(error);
       setResult(error instanceof Error ? error.message : '오류가 발생했습니다. 다시 시도해 주세요.');
     } finally {
+      clearInterval(stageInterval);
       setIsLoading(false);
     }
   };
@@ -201,19 +219,37 @@ export default function CorrectionGuard({ onBack, onConsultLawyer }: { onBack: (
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Input Section */}
         <div className="space-y-4">
-          <div className="bg-white p-6 rounded-3xl border border-[#E2E8F0] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="bg-brand-50 p-2 rounded-lg">
-                  <ShieldAlert className="w-5 h-5 text-brand-600" />
+            <div 
+              className={`relative bg-white p-6 rounded-3xl border shadow-sm space-y-4 transition-all ${
+                isDragging ? 'border-brand-500 bg-brand-50/50 scale-[1.02]' : 'border-[#E2E8F0]'
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                  const event = { target: { files: [file] } } as any;
+                  handleFileChange(event);
+                }
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="bg-brand-50 p-2 rounded-lg">
+                    <ShieldAlert className="w-5 h-5 text-brand-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-[#0F172A] font-serif">보정명령서 입력</h2>
                 </div>
-                <h2 className="text-lg font-bold text-[#0F172A] font-serif">보정명령서 입력</h2>
               </div>
-            </div>
 
-            <p className="text-sm text-[#64748B] leading-relaxed">
-              법원에서 온 보정명령서를 촬영하거나 업로드해 주세요. AI가 즉시 분석하여 대응 방안을 알려드립니다.
-            </p>
+              <p className="text-sm text-[#64748B] leading-relaxed">
+                법원에서 온 보정명령서를 촬영하거나 업로드해 주세요. AI가 즉시 분석하여 필요한 조치와 대응 방안을 알려드립니다.
+              </p>
             
             <div className="flex flex-col sm:flex-row gap-2">
               <button 
@@ -377,12 +413,25 @@ export default function CorrectionGuard({ onBack, onConsultLawyer }: { onBack: (
                 className="h-full min-h-[500px] bg-white border border-[#E2E8F0] rounded-2xl p-8 flex flex-col items-center justify-center space-y-6 text-center"
               >
                 <div className="relative">
-                  <div className="w-16 h-16 border-4 border-[#E2E8F0] border-t-red-600 rounded-full animate-spin" />
-                  <ShieldAlert className="w-6 h-6 text-red-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  <div className="w-20 h-20 border-4 border-slate-100 border-t-brand-600 rounded-full animate-spin" />
+                  <Sparkles className="w-8 h-8 text-brand-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-[#0F172A]">명령서를 분석하고 있습니다</h3>
-                  <p className="text-[#64748B]">법원의 지적 사항을 파악하여 해결책을 찾는 중입니다.</p>
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold text-[#0F172A]">보정 명령을 분석하고 있습니다</h3>
+                  <div className="flex flex-col items-center gap-2">
+                    <AnimatePresence mode="wait">
+                      <motion.p
+                        key={loadingStage}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="text-brand-600 font-medium text-sm"
+                      >
+                        {loadingStages[loadingStage]}
+                      </motion.p>
+                    </AnimatePresence>
+                    <p className="text-xs text-[#64748B]">법원의 지적 사항을 정확히 파악하여 최적의 해결책을 찾는 중입니다.</p>
+                  </div>
                 </div>
               </motion.div>
             ) : (
@@ -438,8 +487,8 @@ export default function CorrectionGuard({ onBack, onConsultLawyer }: { onBack: (
                     </button>
                   </div>
                 </div>
-                <div className="p-4 md:p-8 flex-1 overflow-y-auto prose prose-slate max-w-none prose-headings:text-[#0F172A] prose-headings:font-bold prose-p:text-[#475569] prose-p:leading-relaxed break-words">
-                  <ReactMarkdown>{result}</ReactMarkdown>
+                <div className="p-4 md:p-8 flex-1 overflow-y-auto break-words">
+                  <AIResultViewer content={result} type="correction" />
                 </div>
                 <div className="p-6 bg-brand-50 border-t border-brand-100 space-y-4">
                   <div className="flex gap-3">

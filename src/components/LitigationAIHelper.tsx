@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, MessageCircle, Loader2, ChevronRight } from 'lucide-react';
 import { generateLitigationGuide } from '../services/gemini';
 import ReactMarkdown from 'react-markdown';
+import AIResultViewer from './AIResultViewer';
 
 interface LitigationAIHelperProps {
   currentStep: string;
@@ -82,8 +83,8 @@ export default function LitigationAIHelper({
                     <p className="text-slate-700 font-bold">{lawsuitType} - {currentStep}</p>
                   </div>
                   
-                  <div className="prose prose-slate prose-sm max-w-none">
-                    <ReactMarkdown>{guide || ''}</ReactMarkdown>
+                  <div className="max-w-none">
+                    <AIResultViewer content={guide || ''} type="analysis" />
                   </div>
 
                   <div className="pt-4 border-t border-slate-100">
