@@ -17,13 +17,20 @@ if (!admin.apps.length) {
   try {
     const firebaseConfigPath = path.join(__dirname, 'firebase-applet-config.json');
     let projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+    let config: any = {};
     if (fs.existsSync(firebaseConfigPath)) {
-      const config = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
+      config = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
       projectId = projectId || config.projectId;
     }
-    admin.initializeApp({
-      projectId: projectId || "solo-law-app",
-    });
+    
+    console.log(`[Firebase] Initializing Admin with Project ID: ${projectId || 'ADC'}`);
+    
+    // In this environment, initializeApp() with no args often works best for ADC,
+    // but if we have a projectId, we should provide it.
+    const options: any = {};
+    if (projectId) options.projectId = projectId;
+    
+    admin.initializeApp(options);
   } catch (error) {
     console.error("Firebase Admin initialization error:", error);
   }
@@ -40,14 +47,16 @@ const getDb = () => {
         return getFirestore(admin.app(), config.firestoreDatabaseId);
       }
     }
-    console.log("[Firebase] Using (default) Database");
   } catch (e) {
-    console.error("[Firebase] Failed to get named database, falling back to default:", e);
+    console.warn("[Firebase] Could not initialize named database ID, using default.");
   }
   return getFirestore();
 };
 
 const db = getDb();
+
+// In-memory fallback for AI usage tracking when Firestore permissions fail
+const memoryUsageStore = new Map<string, { count: number, date: string, userId: string }>();
 
 async function startServer() {
   const app = express();
@@ -73,13 +82,15 @@ async function startServer() {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const usageRef = db.collection("ai_usage").doc(`${userId}_${today}`);
+    const usageDocId = `${userId}_${today}`;
+    const dailyLimit = 15;
 
+    // Try Firestore first
     try {
+      const usageRef = db.collection("ai_usage").doc(usageDocId);
       const result = await db.runTransaction(async (transaction) => {
         const usageDoc = await transaction.get(usageRef);
         const currentCount = usageDoc.exists ? usageDoc.data()?.count || 0 : 0;
-        const dailyLimit = 15; // Set a default daily limit
 
         if (currentCount >= dailyLimit) {
           return { allowed: false, currentCount, dailyLimit };
@@ -111,10 +122,40 @@ async function startServer() {
         });
       }
 
+      // Also update memory store as a secondary "fast-cache"
+      memoryUsageStore.set(usageDocId, { count: result.currentCount, date: today, userId });
+
       res.json({ success: true, ...result });
-    } catch (error) {
-      console.error("AI Usage Transaction Error:", error);
-      res.status(500).json({ error: "Internal Server Error" });
+    } catch (error: any) {
+      console.warn("[Firebase] AI Usage Firestore Write Error (Permission/Index):", error.message);
+      
+      // Fallback to memory tracking
+      const current = memoryUsageStore.get(usageDocId) || { count: 0, date: today, userId };
+      if (current.date !== today) {
+        current.count = 0;
+        current.date = today;
+      }
+
+      if (current.count >= dailyLimit) {
+        return res.status(429).json({
+          allowed: false,
+          currentCount: current.count,
+          dailyLimit,
+          error: "Daily AI usage limit reached",
+          message: `일일 AI 사용량(${dailyLimit}회)을 모두 소진했습니다. 내일 다시 이용해 주세요. (Fallback Mode)`
+        });
+      }
+
+      current.count += 1;
+      memoryUsageStore.set(usageDocId, current);
+
+      res.json({ 
+        success: true, 
+        allowed: true, 
+        currentCount: current.count, 
+        dailyLimit,
+        isFallback: true 
+      });
     }
   });
 
@@ -123,33 +164,52 @@ async function startServer() {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      // Simplify query to avoid index requirement for first run
-      const snapshot = await db.collection("ai_usage")
-        .where("date", "==", today)
-        .get();
+      // 1. Collect from Memory
+      const memStatsDocs = Array.from(memoryUsageStore.values())
+        .filter(doc => doc.date === today);
 
-      const allDocs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      // 2. Try to collect from Firestore
+      let fsStatsDocs: any[] = [];
+      try {
+        const snapshot = await db.collection("ai_usage")
+          .where("date", "==", today)
+          .get();
+        fsStatsDocs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      } catch (fsError: any) {
+        console.warn("[Admin] Could not fetch Firestore usage stats:", fsError.message);
+      }
 
-      // Sort in-memory to avoid composite index PERMISSION_DENIED/FAILED_PRECONDITION
-      const topUsers = allDocs
+      // Merge results
+      const userMap = new Map();
+      fsStatsDocs.forEach(d => userMap.set(d.userId, d));
+      memStatsDocs.forEach(d => {
+        const existing = userMap.get(d.userId);
+        if (!existing || d.count > (existing.count || 0)) {
+          userMap.set(d.userId, { ...existing, ...d });
+        }
+      });
+
+      const allStats = Array.from(userMap.values());
+      const topUsers = allStats
         .sort((a: any, b: any) => (b.count || 0) - (a.count || 0))
         .slice(0, 10);
       
-      const totalToday = allDocs.reduce((acc, doc: any) => acc + (doc.count || 0), 0);
+      const totalToday = allStats.reduce((acc, doc: any) => acc + (doc.count || 0), 0);
 
       res.json({
         date: today,
         totalToday,
-        topUsers
+        topUsers,
+        usingFallback: fsStatsDocs.length === 0 && memStatsDocs.length > 0
       });
-    } catch (error) {
-      console.error("[Admin] Fetch Usage Stats Error:", error);
+    } catch (error: any) {
+      console.error("[Admin] Usage Stats Critical Failure:", error.message);
       res.status(500).json({ 
         error: "Internal Server Error",
-        details: error instanceof Error ? error.message : "Unknown error"
+        details: error.message
       });
     }
   });

@@ -225,9 +225,28 @@ export default function AdminDashboard({ onNavigate }: { onNavigate?: (view: any
     const fetchUsageStats = async () => {
       try {
         const res = await fetch('/api/admin/usage-stats');
+        let apiData: any = null;
         if (res.ok) {
-          const data = await res.json();
-          setAiUsageStats(data);
+          apiData = await res.json();
+          setAiUsageStats(apiData);
+        }
+
+        // Try direct client-side fetch to enrich/verify (Admin has rules permission)
+        const today = new Date().toISOString().split('T')[0];
+        const q = query(collection(db, 'ai_usage'), where('date', '==', today));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+          const fsDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const total = fsDocs.reduce((acc, d: any) => acc + (d.count || 0), 0);
+          const top = fsDocs.sort((a: any, b: any) => (b.count || 0) - (a.count || 0)).slice(0, 10);
+          
+          setAiUsageStats({
+            date: today,
+            totalToday: apiData ? Math.max(apiData.totalToday, total) : total,
+            topUsers: top,
+            isLive: true
+          });
         }
       } catch (e) {
         console.error("Failed to fetch usage stats:", e);
